@@ -1,7 +1,12 @@
 """
-hexfeed - entrada do servidor
-Configura e inicia o servidor FastAPI.
-Inclui CORS (qualquer origem), startup, onion service Tor e rota de logout.
+hexfeed - FastAPI server (localhost only + Tor)
+
+SECURITY MODEL:
+  - Binds to 127.0.0.1 ONLY — no external network exposure.
+  - External access exclusively via Tor onion service (.onion).
+  - No CORS, no Swagger, no OpenAPI docs.
+  - Rate limiting (60 req/min per IP), IP banning, security headers.
+  - Tor starts automatically on boot if the tor binary is found.
 """
 
 import os
@@ -120,17 +125,18 @@ def _start_tor():
 
     try:
         tor = TorOnionService(target_port=8000)
-        print("🧅 Iniciando Tor (pode levar até 2 min na primeira vez)...", file=sys.stderr)
+        print("  🧅 Starting Tor (may take up to 2 min on first run)...", file=sys.stderr)
         addr = tor.start()
         if addr:
             onion_address = addr
             _tor_service = tor
-            print(f"🧅 Onion service: http://{addr}", file=sys.stderr)
-            print(f"🧅 Conecte-se via Tor: http://{addr}", file=sys.stderr)
+            print(f"  🧅 Onion service active: http://{addr}", file=sys.stderr)
+            print(f"  🧅 Share this address for external access — no real IP is exposed.", file=sys.stderr)
         else:
-            print("⚠️  Tor não disponível — servidor rodando sem onion service", file=sys.stderr)
+            print("  ⚠️  Tor not available — server is localhost-only.", file=sys.stderr)
+            print("  ⚠️  Install tor to enable onion service: sudo apt install tor", file=sys.stderr)
     except Exception as e:
-        print(f"⚠️  Erro ao iniciar Tor: {e} — servidor rodando sem onion service", file=sys.stderr)
+        print(f"  ⚠️  Tor error: {e} — server is localhost-only.", file=sys.stderr)
 
 
 @app.on_event("startup")

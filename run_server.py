@@ -1,33 +1,40 @@
 #!/usr/bin/env python3
 """
-hexfeed - server launcher
-Usage: python run_server.py [--host HOST] [--port PORT]
+hexfeed - server launcher (localhost only + Tor)
+Usage: python run_server.py [--port PORT]
 
-Starts the hexfeed FastAPI server.
-Default: http://127.0.0.1:8000
+⚠️  Binds to 127.0.0.1 ONLY — no external IP exposure.
+   External access is only possible via Tor onion service.
+   Tor starts automatically if the tor binary is available.
 """
 
 import argparse
 import uvicorn
 
+HOST = "127.0.0.1"
+PORT = 8000
+
 
 def main():
-    parser = argparse.ArgumentParser(description="hexfeed server")
-    parser.add_argument("--host", default="127.0.0.1", help="Endereço para escutar")
-    parser.add_argument("--port", type=int, default=8000, help="Porta")
-    parser.add_argument("--reload", action="store_true", help="Reload automático em alterações")
+    parser = argparse.ArgumentParser(description="hexfeed server (localhost only)")
+    parser.add_argument("--port", type=int, default=PORT, help="Porta")
+    parser.add_argument("--reload", action="store_true", help="Auto-reload on changes")
     args = parser.parse_args()
 
-    print(f"  ⬡ hexfeed server starting on {args.host}:{args.port}")
+    print(f"  ⬡ hexfeed: http://{HOST}:{args.port}")
     print()
 
     uvicorn.run(
         "server.main:app",
-        host=args.host,
+        host=HOST,
         port=args.port,
         reload=args.reload,
         log_level="info",
     )
+
+
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":

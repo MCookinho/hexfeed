@@ -1,4 +1,10 @@
-"""Entry point for hexfeed server + admin panel."""
+"""
+hexfeed-server - server + admin launcher (localhost only + Tor)
+
+⚠️  Binds to 127.0.0.1 ONLY — no external IP exposure.
+   External access is only possible via Tor onion service.
+   Tor starts automatically if the tor binary is available.
+"""
 import sys
 import os
 import time
@@ -6,12 +12,12 @@ import subprocess
 import signal
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HOST = "127.0.0.1"
 
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="hexfeed server")
-    parser.add_argument("--host", default="127.0.0.1", help="Server address")
+    parser = argparse.ArgumentParser(description="hexfeed server (localhost only)")
     parser.add_argument("--port", type=int, default=8000, help="Server port")
     parser.add_argument("--admin-port", type=int, default=8001, help="Admin panel port")
     parser.add_argument("--reload", action="store_true", help="Auto-reload on changes")
@@ -19,7 +25,7 @@ def main():
 
     main_proc = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "server.main:app",
-         "--host", args.host, "--port", str(args.port),
+         "--host", HOST, "--port", str(args.port),
          "--log-level", "info"] + (["--reload"] if args.reload else []),
         cwd=BASE_DIR,
     )
@@ -35,11 +41,13 @@ def main():
             cwd=BASE_DIR,
         )
 
-    print(f"  ⬡ hexfeed server: http://{args.host}:{args.port}")
+    print(f"  ⬡ hexfeed:         http://{HOST}:{args.port}")
     if admin_proc:
-        print(f"  ⬡ Admin panel:    http://127.0.0.1:{args.admin_port}")
+        print(f"  ⬡ Admin panel:     http://{HOST}:{args.admin_port}")
+    print("  🧅 Tor onion:       auto if tor binary is available")
     print()
     print("  Press Ctrl+C to stop all services.")
+    print()
 
     def cleanup(sig, frame):
         for p in [main_proc, admin_proc]:
@@ -62,3 +70,7 @@ def main():
             admin_proc.wait()
     except KeyboardInterrupt:
         cleanup(None, None)
+
+
+if __name__ == "__main__":
+    main()
