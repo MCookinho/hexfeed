@@ -1,0 +1,72 @@
+name: Publish to AUR
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Git tag to publish (e.g. v0.1.0)"
+        required: true
+
+jobs:
+  aur-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "ref=refs/tags/$TAG" >> $GITHUB_OUTPUT
+
+      - name: Download tarball and compute checksum
+        id: checksum
+        run: |
+          URL="https://github.com/${{ github.repository }}/archive/${{ steps.version.outputs.tag }}.tar.gz"
+          curl -sL "$URL" -o /tmp/release.tar.gz
+          SHA256=$(sha256sum /tmp/release.tar.gz | cut -d' ' -f1)
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AUR_SSH_KEY }}" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          cat >> ~/.ssh/config << 'EOF'
+          Host aur.archlinux.org
+            IdentityFile ~/.ssh/aur
+            StrictHostKeyChecking accept-new
+            User git
+          EOF
+
+      - name: Clone AUR package
+        run: |
+          git clone ssh://aur@aur.archlinux.org/hexfeed.git /tmp/aur-pkg
+
+      - name: Update PKGBUILD
+        working-directory: /tmp/aur-pkg
+        run: |
+          sed -i "s/^pkgver=.*/pkgver=${{ steps.version.outputs.version }}/" PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
+          sed -i "s|sha256sums=('[^']*'|sha256sums=('${{ steps.checksum.outputs.sha256 }}'|" PKGBUILD
+
+      - name: Regenerate .SRCINFO
+        working-directory: /tmp/aur-pkg
+        run: |
+          makepkg --printsrcinfo > .SRCINFO
+
+      - name: Commit and push to AUR
+        working-directory: /tmp/aur-pkg
+        run: |
+          git add PKGBUILD .SRCINFO
+          git -c user.name="MCookinho" -c user.email="mistercookie@archlinux.org" \
+            commit -m "Update to v${{ steps.version.outputs.version }}"
+          git push origin master
