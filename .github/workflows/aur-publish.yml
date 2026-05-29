@@ -67,7 +67,7 @@ jobs:
           pkgname=hexfeed
           pkgver=${{ steps.version.outputs.version }}
           pkgrel=1
-          pkgdesc="Private social network in your terminal. Minimalist, encrypted TUI client with Tor support."
+          pkgdesc="Anonymous private social network. Tor-native, zero IP leaks, zero trackers."
           arch=('any')
           url="https://github.com/${{ github.repository }}"
           license=('MIT')
@@ -111,7 +111,7 @@ jobs:
           # Generate .SRCINFO by hand since makepkg may not be available
           cat > .SRCINFO << SRCEOF
           pkgbase = hexfeed
-          pkgdesc = Private social network in your terminal. Minimalist, encrypted TUI client with Tor support.
+          pkgdesc = Anonymous private social network. Tor-native, zero IP leaks, zero trackers.
           pkgver = ${{ steps.version.outputs.version }}
           pkgrel = 1
           url = https://github.com/${{ github.repository }}

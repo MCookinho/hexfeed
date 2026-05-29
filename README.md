@@ -1,58 +1,88 @@
 # Hexfeed
 
-> Private social network in your terminal. Minimalist, encrypted, Tor-ready.
+> **Anonymous** private social network in your terminal. Tor-native, zero IP leaks, zero trackers.
 
-hexfeed is a **self-hosted** social networking platform with a **terminal UI** client. No JavaScript, no trackers, no centralized servers — just you, your friends, and your terminal.
+hexfeed is a **self-hosted**, **anonymous-by-design** social networking platform with a **terminal UI** client. No JavaScript, no tracking, no centralized servers — just you, your friends, and your terminal.
+
+```
+🧅 Tor onion service — no real IP ever exposed
+🔒 No IPs stored — login attempts, logs, rate limiters all IP-free
+📁 No filenames — uploads stored as UUIDs, original names never leak
+🕵️ No Server header — no version fingerprinting
+📧 No email — no PII collected or exposed
+```
 
 ![](https://img.shields.io/badge/python-%3E%3D3.11-blue)
 ![](https://img.shields.io/badge/license-MIT-green)
 ![](https://img.shields.io/badge/status-beta-yellow)
+[![](https://img.shields.io/badge/aur-hexfeed-blue)](https://aur.archlinux.org/packages/hexfeed)
 
 ---
 
+## Anonymity Model
+
+| Attack Vector | Protection |
+|---|---|
+| **Server IP discovery** | Server binds exclusively to `127.0.0.1`. External access **only** via `.onion`. No `--host 0.0.0.0` possible. |
+| **IP logging** | `login_attempts` and `security_events` tables have **no IP column**. Zero user IPs persisted. |
+| **Access logs** | uvicorn `access_log=False`, `log_level=warning`. No request logging with IPs. |
+| **Server fingerprinting** | `Server` header stripped from all HTTP responses. No version leaks. |
+| **Rate limiter IP tracking** | All IPs hashed with per-boot random salt before storage in memory. |
+| **Email / PII** | No email field in API responses. Not collected at registration. |
+| **File metadata** | Original filenames never stored or returned. UUIDs only. |
+| **Filesystem paths** | Avatar paths stored as relative. No absolute path leaks. |
+| **Admin panel** | In-memory admin rate limiter uses hashed IPs. No IP column in login display. |
+| **Traffic analysis** | Full Tor onion service with ephemeral key persistence. |
+
 ## Features
 
+- **100% Anonymous** — No IPs, no logs, no Server header, no PII
+- **Tor-native** — Auto-start `.onion` hidden service when `tor` is installed
 - **Terminal UI** — Fast, keyboard-driven client built with [Textual](https://textual.textualize.io)
 - **Self-hosted** — Your data, your server. No cloud, no surveillance
-- **Tor support** — Optional `.onion` hidden service via [Stem](https://stem.torproject.org)
 - **Encrypted DMs** — End-to-end encrypted direct messages using PGP
-- **Admin panel** — Web-based admin at `:8001` with dashboard, user management, IP ban, audit logs, and more
+- **Admin panel** — Web-based admin at `:8001` with dashboard, user management, IP ban, audit
+- **Proof-of-Work** — Hashcash-style PoW + math challenge to prevent bot registration
 - **i18n** — Multi-language interface (Portuguese, English)
 - **Minimalist** — No JavaScript frontend. Just a Python server + TUI client
-- **Private by design** — No telemetry, no ads, no tracking
 
 ## Quick start
 
 ### Requirements
 
 - Python 3.11+
-- pip
-- Tor (optional, for `.onion`)
+- Tor (optional, for `.onion` — **recommended for anonymity**)
 
 ### Install
 
 ```bash
-# Clone
+# AUR (Arch Linux) — recommended
+yay -S hexfeed
+
+# Or from source
 git clone https://github.com/MCookinho/hexfeed.git
 cd hexfeed
-
-# Create venv and install
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
-
-# Or use the install script
-bash scripts/install.sh
 ```
 
 ### Start
 
 ```bash
-# Start the server (default: http://127.0.0.1:8000)
+# Start the server (localhost only + Tor if available)
 hexfeed-server
 
 # In another terminal, start the client
 hexfeed
+```
+
+On first run, Tor auto-starts if the `tor` binary is available:
+```
+  ⬡ hexfeed:         http://127.0.0.1:8000
+  🧅 Starting Tor (may take up to 2 min on first run)...
+  🧅 Onion service active: http://abcdef1234567890.onion
+  🧅 Share this address for external access — no real IP is exposed.
 ```
 
 ### First-time setup
@@ -60,11 +90,24 @@ hexfeed
 1. Register an account from the TUI client
 2. Access the admin panel at **http://127.0.0.1:8001/admin**
 3. Set your admin password on first access
-4. That's it. You're running your own social network.
+4. That's it. You're running your own anonymous social network.
 
-## Documentation
+### Share your onion address
 
-### Architecture
+```bash
+curl http://127.0.0.1:8000/api/onion
+# → {"onion_address": "abcdef1234567890.onion"}
+```
+
+Share this address with friends. They connect via Tor — **no one sees your real IP**.
+
+## Architecture
+
+```
+Internet ──> Tor Network ──> .onion ──> 127.0.0.1:8000 ──> FastAPI ──> SQLite
+Local    ──> 127.0.0.1:8000 (same machine)
+LAN      ──> ❌ Blocked by design
+```
 
 ```
 ┌──────────────┐     HTTP/JSON      ┌──────────────┐
@@ -74,37 +117,15 @@ hexfeed
                                             │
                                    ┌────────┴────────┐
                                    │  SQLite3         │
-                                   │  (data/hexfeed.db)│
+                                   │  (no IP storage) │
                                    └─────────────────┘
 ```
 
-### File structure
-
-```
-hexfeed/
-├── client/              # TUI client (Textual)
-│   ├── app.py           # Main app
-│   ├── screens/         # UI screens
-│   ├── api.py           # HTTP client
-│   └── i18n.py          # Internationalization
-├── server/              # FastAPI server
-│   ├── main.py          # Server entry
-│   ├── routes.py        # API routes
-│   ├── auth.py          # Authentication
-│   ├── admin_server.py  # Admin panel
-│   └── database.py      # SQLite layer
-├── templates/           # Admin panel HTML
-├── hexfeed/             # Pip entry points
-├── scripts/             # Install scripts
-├── tests/               # Test suite
-└── pyproject.toml       # Package config
-```
-
-### API
+## API
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| POST | `/register` | Create account |
+| POST | `/register` | Create account (PoW + math challenge required) |
 | POST | `/login` | Authenticate |
 | GET | `/feed` | Get timeline |
 | POST | `/posts` | Create post |
@@ -112,29 +133,18 @@ hexfeed/
 | GET | `/users/{username}` | User profile |
 | POST | `/dm/send` | Send encrypted DM |
 | GET | `/dm/inbox` | Read DMs |
-
-### Security
-
-- Passwords hashed with bcrypt
-- DMs encrypted with PGP (per-recipient)
-- Admin sessions with strict cookies + rate limiting
-- File upload magic-byte validation
-- Token expiry (30 days)
-- IP banning via admin panel
-- Security headers on all responses
+| GET | `/api/onion` | Get server's `.onion` address |
 
 ## Platform installation
+
+### Arch Linux (AUR) — recommended
+```bash
+yay -S hexfeed
+```
 
 ### Linux (any distro)
 ```bash
 bash scripts/install.sh
-```
-
-### Arch Linux (AUR)
-```bash
-yay -S hexfeed
-# or use the manual script:
-bash scripts/install-arch.sh
 ```
 
 ### macOS
@@ -150,13 +160,8 @@ powershell -ExecutionPolicy Bypass -File scripts/install.ps1
 ## Development
 
 ```bash
-# Install dev dependencies
 pip install -e ".[dev]"
-
-# Run tests
 python -m pytest
-
-# Run with auto-reload
 hexfeed-server --reload
 ```
 
@@ -167,3 +172,4 @@ MIT License. See [LICENSE](LICENSE).
 ---
 
 > Built with Python, [Textual](https://textual.textualize.io), and [FastAPI](https://fastapi.tiangolo.com).
+> **Anonymity is not a feature. It's a requirement.**
