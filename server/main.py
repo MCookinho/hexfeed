@@ -12,6 +12,7 @@ SECURITY MODEL:
 import os
 import sys
 import time
+import hashlib
 import threading
 from pathlib import Path
 from collections import defaultdict
@@ -34,7 +35,12 @@ app = FastAPI(
     openapi_url=None,
 )
 
+_RATE_SALT = hashlib.sha256(os.urandom(32)).hexdigest()[:16]
 _rate_limit_store: dict[str, deque] = defaultdict(lambda: deque(maxlen=60))
+
+
+def _hash_ip(ip: str) -> str:
+    return hashlib.sha256(f"{_RATE_SALT}{ip}".encode()).hexdigest()[:16]
 
 
 @app.middleware("http")
@@ -43,6 +49,8 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Server"] = ""
+    del response.headers["Server"]
     return response
 
 
@@ -71,17 +79,18 @@ async def ip_ban_middleware(request: Request, call_next):
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     client_ip = request.client.host if request.client else "unknown"
+    ip_hash = _hash_ip(client_ip)
     now = time.time()
     window = 60.0
 
-    timestamps = _rate_limit_store[client_ip]
+    timestamps = _rate_limit_store[ip_hash]
     while timestamps and timestamps[0] < now - window:
         timestamps.popleft()
 
     if len(timestamps) >= 60:
         return JSONResponse(
             status_code=429,
-            content={"detail": "Muitas requisições. Aguarde e tente novamente."},
+            content={"detail": "Too many requests. Please wait."},
         )
 
     timestamps.append(now)

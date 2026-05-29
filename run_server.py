@@ -29,7 +29,8 @@ def main():
         host=HOST,
         port=args.port,
         reload=args.reload,
-        log_level="info",
+        log_level="warning",
+        access_log=False,
     )
 
 

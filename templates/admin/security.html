@@ -53,7 +53,6 @@
     <tr>
       <th>ID</th>
       <th>Username</th>
-      <th>IP</th>
       <th>Success</th>
       <th>Created At</th>
     </tr>
@@ -63,7 +62,6 @@
     <tr>
       <td class="text-dim">#{{ la.id }}</td>
       <td>{{ la.username or '-' }}</td>
-      <td class="text-dim">{{ la.ip }}</td>
       <td>
         {% if la.success %}
         <span class="badge" style="background:rgba(158,206,106,0.15);color:var(--success)">Yes</span>
@@ -101,7 +99,6 @@
       <th>Event Type</th>
       <th>Description</th>
       <th>Username</th>
-      <th>IP</th>
       <th>Created At</th>
     </tr>
   </thead>
@@ -112,7 +109,6 @@
       <td><span class="badge" style="background:rgba(224,175,104,0.15);color:var(--warning)">{{ e.event_type }}</span></td>
       <td class="text-truncate" title="{{ e.description }}" style="max-width:250px">{{ e.description }}</td>
       <td>{{ e.username or '-' }}</td>
-      <td class="text-dim">{{ e.ip or '-' }}</td>
       <td class="text-dim">{{ e.created_at[:19] }}</td>
     </tr>
     {% endfor %}

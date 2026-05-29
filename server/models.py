@@ -79,7 +79,6 @@ class UserResponse(BaseModel):
     display_name: str
     bio: str
     avatar_path: str
-    email: str = ""
     created_at: str
     follower_count: int = 0
     following_count: int = 0

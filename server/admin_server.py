@@ -24,6 +24,7 @@ import time
 import socket
 import shutil
 import struct
+import hashlib
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -71,9 +72,12 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 templates.env.cache = None
 _sessions: dict[str, float] = {}
 _session_created: dict[str, str] = {}
-_app_start_time: float = time.time()
-_slow_query_log: deque = deque(maxlen=50)
 _admin_login_attempts: dict[str, list[float]] = {}
+_ADMIN_RATE_SALT = hashlib.sha256(os.urandom(32)).hexdigest()[:16]
+
+
+def _hash_admin_ip(ip: str) -> str:
+    return hashlib.sha256(f"{_ADMIN_RATE_SALT}{ip}".encode()).hexdigest()[:16]
 
 
 def _get_db() -> sqlite3.Connection:
@@ -185,7 +189,7 @@ def _delete_user_physical_files(user_id: int, conn: sqlite3.Connection):
             fp.unlink()
     u = conn.execute("SELECT avatar_path FROM users WHERE id = ?", (user_id,)).fetchone()
     if u and u["avatar_path"]:
-        av = Path(u["avatar_path"])
+        av = AVATAR_DIR / Path(u["avatar_path"]).name
         if av.exists():
             av.unlink()
 
@@ -296,7 +300,6 @@ def _init_tables():
     conn.execute("""CREATE TABLE IF NOT EXISTS login_attempts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT NOT NULL,
-        ip TEXT DEFAULT '',
         success INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""")
@@ -305,7 +308,6 @@ def _init_tables():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         event_type TEXT NOT NULL,
         description TEXT DEFAULT '',
-        ip TEXT DEFAULT '',
         username TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""")
@@ -345,14 +347,14 @@ async def login_page(request: Request):
 @app.post("/login")
 async def login(request: Request, password: str = Form(...)):
     now = time.time()
-    ip = request.client.host if request.client else "unknown"
-    attempts = _admin_login_attempts.setdefault(ip, [])
+    ip_hash = _hash_admin_ip(request.client.host if request.client else "unknown")
+    attempts = _admin_login_attempts.setdefault(ip_hash, [])
     attempts = [t for t in attempts if t > now - 60]
     if len(attempts) >= 5:
         return templates.TemplateResponse(request, "login.html", {"request": request, "error": "Too many attempts. Wait 60 seconds."}, status_code=429)
     stored_hash = _load_admin_hash()
     if not stored_hash:
-        return templates.TemplateResponse(request, "login.html", {"request": request, "error": "Admin n\u00e3o configurado. Execute --setup primeiro."}, status_code=401)
+        return templates.TemplateResponse(request, "login.html", {"request": request, "error": "Admin not configured. Run --setup first."}, status_code=401)
     if bcrypt.checkpw(password.encode(), stored_hash.encode()):
         token = secrets.token_hex(32)
         _sessions[token] = time.time() + SESSION_TTL
@@ -361,7 +363,7 @@ async def login(request: Request, password: str = Form(...)):
         resp.set_cookie("admin_token", token, httponly=True, max_age=SESSION_TTL, path="/", samesite="strict")
         return resp
     attempts.append(now)
-    _admin_login_attempts[ip] = attempts
+    _admin_login_attempts[ip_hash] = attempts
     return templates.TemplateResponse(request, "login.html", {"request": request, "error": "Incorrect password."}, status_code=401)
 
 
@@ -1506,11 +1508,11 @@ async def prune_orphaned(request: Request):
             if row["avatar_path"]:
                 avatars_in_use.add(Path(row["avatar_path"]).name)
 
+    if AVATAR_DIR.exists():
         for f in AVATAR_DIR.iterdir():
-            if f.is_file() and f.name not in avatars_in_use:
+            if f.name not in avatars_in_use:
                 try:
                     f.unlink()
-                    pruned_count += 1
                 except Exception:
                     pass
 

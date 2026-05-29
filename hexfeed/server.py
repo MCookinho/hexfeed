@@ -26,7 +26,8 @@ def main():
     main_proc = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "server.main:app",
          "--host", HOST, "--port", str(args.port),
-         "--log-level", "info"] + (["--reload"] if args.reload else []),
+         "--log-level", "warning", "--no-access-log",
+         "--no-server-header"] + (["--reload"] if args.reload else []),
         cwd=BASE_DIR,
     )
 
@@ -37,7 +38,8 @@ def main():
         admin_proc = subprocess.Popen(
             [sys.executable, "-m", "uvicorn", "server.admin_server:app",
              "--host", "127.0.0.1", "--port", str(args.admin_port),
-             "--log-level", "info"],
+             "--log-level", "warning", "--no-access-log",
+             "--no-server-header"],
             cwd=BASE_DIR,
         )
 

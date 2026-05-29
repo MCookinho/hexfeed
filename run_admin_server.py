@@ -80,8 +80,8 @@ def main():
         app,
         host=ADMIN_HOST,
         port=port,
-        log_level="info",
-        access_log=True,
+        log_level="warning",
+        access_log=False,
     )
 
 

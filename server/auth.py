@@ -93,11 +93,13 @@ def create_token(user_id: int, conn=None) -> str:
 def get_user_from_token(token: str, conn=None) -> dict | None:
     """
     Busca um usuário pelo token de autenticação.
-    Retorna o dicionário com dados do usuário ou None se inválido.
+    Retorna apenas dados mínimos do usuário (sem password_hash, pgp, email).
     """
     cursor, close_conn = _execute_with_conn(
         conn,
-        """SELECT u.* FROM users u
+        """SELECT u.id, u.username, u.display_name, u.bio, u.banned,
+                  u.avatar_path, u.created_at, u.pgp_fingerprint
+           FROM users u
            JOIN tokens t ON u.id = t.user_id
            WHERE t.token = ? AND t.created_at >= datetime('now', '-30 days')""",
         (token,),

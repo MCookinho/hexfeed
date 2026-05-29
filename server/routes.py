@@ -4,7 +4,7 @@ Todos os endpoints REST do servidor hexfeed.
 Organizado por seções: Auth, Users, Follows, Posts, Likes, Chat, Files, DMs.
 """
 
-import uuid, time, threading, hashlib, secrets, random, re
+import uuid, time, threading, hashlib, secrets, random, re, os
 from collections import defaultdict
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query, Request
@@ -15,6 +15,12 @@ from server.auth import (
     hash_password, verify_password, create_token, get_user_from_token,
     delete_token, validate_pgp_key, verify_pgp_private_key,
 )
+
+_RATE_SALT = hashlib.sha256(os.urandom(32)).hexdigest()[:16]
+
+
+def _hash_ip(ip: str) -> str:
+    return hashlib.sha256(f"{_RATE_SALT}{ip}".encode()).hexdigest()[:16]
 from server.models import (
     RegisterRequest, LoginRequest, CreatePostRequest, CreateCommentRequest,
     UpdateProfileRequest,
@@ -76,14 +82,15 @@ def check_rate_limit(ip: str):
     now = time.time()
     window = int(get_setting("rate_window_hours", "1")) * 3600
     max_attempts = int(get_setting("max_register_attempts", "15"))
-    REGISTER_ATTEMPTS[ip] = [t for t in REGISTER_ATTEMPTS[ip] if now - t < window]
-    if len(REGISTER_ATTEMPTS[ip]) >= max_attempts:
-        raise HTTPException(429, "Muitas tentativas de registro. Aguarde 1 hora.")
+    ip_hash = _hash_ip(ip)
+    REGISTER_ATTEMPTS[ip_hash] = [t for t in REGISTER_ATTEMPTS[ip_hash] if now - t < window]
+    if len(REGISTER_ATTEMPTS[ip_hash]) >= max_attempts:
+        raise HTTPException(429, "Too many registration attempts. Wait 1 hour.")
 
 
 def record_attempt(ip: str):
-    """Registra uma tentativa de registro para rate limiting."""
-    REGISTER_ATTEMPTS[ip].append(time.time())
+    ip_hash = _hash_ip(ip)
+    REGISTER_ATTEMPTS[ip_hash].append(time.time())
 
 
 def generate_pow_challenge() -> str:
@@ -190,7 +197,6 @@ def user_to_response(u: dict, current_user_id: int | None = None) -> dict:
         "display_name": u["display_name"] or "",
         "bio": u["bio"] or "",
         "avatar_path": u["avatar_path"] or "",
-        "email": u.get("email") or "",
         "created_at": u["created_at"],
         "follower_count": followers,
         "following_count": following,
@@ -413,12 +419,10 @@ def login(body: LoginRequest, request: Request = None):
         "SELECT * FROM users WHERE username = ?", (body.username,)
     ).fetchone()
 
-    client_ip = request.client.host if request and request.client else ""
-
     if not user or not verify_password(body.password, user["password_hash"]):
         conn.execute(
-            "INSERT INTO login_attempts (username, ip, success) VALUES (?, ?, 0)",
-            (body.username, client_ip),
+            "INSERT INTO login_attempts (username, success) VALUES (?, 0)",
+            (body.username,),
         )
         conn.commit()
         conn.close()
@@ -426,8 +430,8 @@ def login(body: LoginRequest, request: Request = None):
 
     if user["banned"]:
         conn.execute(
-            "INSERT INTO login_attempts (username, ip, success) VALUES (?, ?, 0)",
-            (body.username, client_ip),
+            "INSERT INTO login_attempts (username, success) VALUES (?, 0)",
+            (body.username,),
         )
         conn.commit()
         conn.close()
@@ -437,24 +441,24 @@ def login(body: LoginRequest, request: Request = None):
         priv_key = (body.pgp_private_key or "").strip()
         if not priv_key:
             conn.execute(
-                "INSERT INTO login_attempts (username, ip, success) VALUES (?, ?, 0)",
-                (body.username, client_ip),
+                "INSERT INTO login_attempts (username, success) VALUES (?, 0)",
+                (body.username,),
             )
             conn.commit()
             conn.close()
             raise HTTPException(401, "Chave PGP privada é necessária para esta conta")
         if not verify_pgp_private_key(priv_key, user["pgp_fingerprint"]):
             conn.execute(
-                "INSERT INTO login_attempts (username, ip, success) VALUES (?, ?, 0)",
-                (body.username, client_ip),
+                "INSERT INTO login_attempts (username, success) VALUES (?, 0)",
+                (body.username,),
             )
             conn.commit()
             conn.close()
             raise HTTPException(401, "Chave PGP privada inválida")
 
     conn.execute(
-        "INSERT INTO login_attempts (username, ip, success) VALUES (?, ?, 1)",
-        (body.username, client_ip),
+        "INSERT INTO login_attempts (username, success) VALUES (?, 1)",
+        (body.username,),
     )
     conn.commit()
 
@@ -1864,7 +1868,7 @@ def download_file(file_id: int, user: dict = Depends(require_user)):
     conn.close()
     return FileResponse(
         path=str(file_path),
-        filename=f["original_name"],
+        filename=f["storage_name"],
         media_type=f["content_type"] or "application/octet-stream",
     )
         
@@ -1925,11 +1929,12 @@ async def upload_avatar(
     await _read_upload_stream(file, avatar_path, 2 * 1024 * 1024, request)
 
     conn = get_connection()
+    relative_path = f"uploads/avatars/{avatar_name}"
     conn.execute("UPDATE users SET avatar_path = ? WHERE id = ?",
-    (str(avatar_path), user["id"]))
+    (relative_path, user["id"]))
     conn.commit()
     conn.close()
-    return {"status": "ok", "avatar_path": f"/uploads/avatars/{avatar_name}"}
+    return {"status": "ok", "avatar_path": f"/{relative_path}"}
         
         
 @router.get("/users/{username}/avatar")
@@ -1940,7 +1945,7 @@ def get_avatar(username: str):
     if not u or not u["avatar_path"]:
         conn.close()
         raise HTTPException(404, "Avatar não encontrado")
-    p = Path(u["avatar_path"])
+    p = AVATAR_DIR / Path(u["avatar_path"]).name
     if not p.exists():
         conn.close()
         raise HTTPException(404, "Arquivo de avatar não encontrado")
@@ -2015,7 +2020,7 @@ def download_dm_file(file_id: int, user: dict = Depends(require_user)):
     return Response(
         content=decrypted,
         media_type=f["content_type"] or "application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{f["original_name"]}"'},
+        headers={"Content-Disposition": f'attachment; filename="{f["storage_name"]}"'},
     )
         
         
