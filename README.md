@@ -1,4 +1,4 @@
-# hexfeed
+# Hexfeed
 
 > Private social network in your terminal. Minimalist, encrypted, Tor-ready.
 
