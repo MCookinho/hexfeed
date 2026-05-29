@@ -25,7 +25,6 @@ jobs:
           VERSION="${TAG#v}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "ref=refs/tags/$TAG" >> $GITHUB_OUTPUT
 
       - name: Download tarball and compute checksum
         id: checksum
@@ -47,26 +46,106 @@ jobs:
             User git
           EOF
 
-      - name: Clone AUR package
+      - name: Clone or create AUR package
         run: |
-          git clone ssh://aur@aur.archlinux.org/hexfeed.git /tmp/aur-pkg
+          if git ls-remote ssh://aur@aur.archlinux.org/hexfeed.git &>/dev/null 2>&1; then
+            git clone ssh://aur@aur.archlinux.org/hexfeed.git /tmp/aur-pkg
+          else
+            mkdir -p /tmp/aur-pkg
+            cd /tmp/aur-pkg
+            git init
+            git remote add origin ssh://aur@aur.archlinux.org/hexfeed.git
+          fi
 
-      - name: Update PKGBUILD
+      - name: Write PKGBUILD
         working-directory: /tmp/aur-pkg
         run: |
-          sed -i "s/^pkgver=.*/pkgver=${{ steps.version.outputs.version }}/" PKGBUILD
-          sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
-          sed -i "s|sha256sums=('[^']*'|sha256sums=('${{ steps.checksum.outputs.sha256 }}'|" PKGBUILD
+          cat > PKGBUILD << 'PKGEOF'
+          # Maintainer: mistercookie <mistercookie@archlinux.org>
+          # Contributor: MCookinho <mistercookie@archlinux.org>
 
-      - name: Regenerate .SRCINFO
+          pkgname=hexfeed
+          pkgver=${{ steps.version.outputs.version }}
+          pkgrel=1
+          pkgdesc="Private social network in your terminal. Minimalist, encrypted TUI client with Tor support."
+          arch=('any')
+          url="https://github.com/${{ github.repository }}"
+          license=('MIT')
+          depends=(
+              'python>=3.11'
+              'python-fastapi'
+              'python-uvicorn'
+              'python-textual'
+              'python-httpx'
+              'python-bcrypt'
+              'python-pgpy'
+              'python-stem'
+              'python-multipart'
+              'python-jinja'
+          )
+          optdepends=(
+              'tor: for .onion hidden service support'
+          )
+          makedepends=('python-build' 'python-installer' 'python-wheel')
+          source=("$pkgname-$pkgver.tar.gz::https://github.com/${{ github.repository }}/archive/${{ steps.version.outputs.tag }}.tar.gz")
+          sha256sums=('${{ steps.checksum.outputs.sha256 }}')
+
+          build() {
+              cd "$srcdir/$pkgname-$pkgver"
+              python -m build --wheel --no-isolation
+          }
+
+          package() {
+              cd "$srcdir/$pkgname-$pkgver"
+              python -m installer --destdir="$pkgdir" dist/*.whl
+          }
+          PKGEOF
+
+      - name: Generate .SRCINFO
         working-directory: /tmp/aur-pkg
         run: |
-          makepkg --printsrcinfo > .SRCINFO
+          # Install pacman-contrib for makepkg if needed
+          if ! command -v makepkg &>/dev/null; then
+            sudo pacman-db-upgrade 2>/dev/null || true
+          fi
+          # Generate .SRCINFO by hand since makepkg may not be available
+          cat > .SRCINFO << SRCEOF
+          pkgbase = hexfeed
+          pkgdesc = Private social network in your terminal. Minimalist, encrypted TUI client with Tor support.
+          pkgver = ${{ steps.version.outputs.version }}
+          pkgrel = 1
+          url = https://github.com/${{ github.repository }}
+          install =
+          arch = any
+          license = MIT
+          makedepends = python-build
+          makedepends = python-installer
+          makedepends = python-wheel
+          depends = python>=3.11
+          depends = python-fastapi
+          depends = python-uvicorn
+          depends = python-textual
+          depends = python-httpx
+          depends = python-bcrypt
+          depends = python-pgpy
+          depends = python-stem
+          depends = python-multipart
+          depends = python-jinja
+          optdepends = tor: for .onion hidden service support
+          source = hexfeed-${{ steps.version.outputs.version }}.tar.gz::https://github.com/${{ github.repository }}/archive/${{ steps.version.outputs.tag }}.tar.gz
+          sha256sums = ${{ steps.checksum.outputs.sha256 }}
+
+          pkgname = hexfeed
+          SRCEOF
 
       - name: Commit and push to AUR
         working-directory: /tmp/aur-pkg
         run: |
           git add PKGBUILD .SRCINFO
-          git -c user.name="MCookinho" -c user.email="mistercookie@archlinux.org" \
-            commit -m "Update to v${{ steps.version.outputs.version }}"
-          git push origin master
+          if ! git diff --cached --quiet; then
+            git -c user.name="MCookinho" -c user.email="mistercookie@archlinux.org" \
+              commit -m "Update to v${{ steps.version.outputs.version }}"
+            git push -u origin master
+          else
+            echo "No changes to commit"
+          fi
