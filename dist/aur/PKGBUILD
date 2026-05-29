@@ -25,7 +25,7 @@ optdepends=(
 )
 makedepends=('python-build' 'python-installer' 'python-wheel')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/MCookinho/hexfeed/archive/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('8e8eef4c2853c85bfdb76af996980b587e4e2632f40b50d8282cb8dd34bbfba6')
 
 build() {
     cd "$srcdir/$pkgname-$pkgver"
@@ -35,5 +35,4 @@ build() {
 package() {
     cd "$srcdir/$pkgname-$pkgver"
     python -m installer --destdir="$pkgdir" dist/*.whl
-    install -Dm755 dist/aur/hexfeed-server.sh "$pkgdir/usr/bin/hexfeed-server"
 }
