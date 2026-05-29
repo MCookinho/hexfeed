@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Network &amp; Storage{% endblock %}
+{% block content %}
+<h1>Network &amp; Storage</h1>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+{% if success %}
+<div class="alert alert-success">{{ success }}</div>
+{% endif %}
+
+<!-- Section 1: Tor Status -->
+<h2>Tor Status</h2>
+<div class="card-grid" style="grid-template-columns:repeat(auto-fill,minmax(250px,1fr))">
+  <div class="card {% if tor_online %}success{% else %}danger{% endif %}">
+    <div class="value">{{ 'Online' if tor_online else 'Offline' }}</div>
+    <div class="label">Tor</div>
+    {% if tor_version %}
+    <div class="text-dim" style="font-size:0.75rem;margin-top:0.25rem">Version: {{ tor_version }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Section 2: Storage Statistics -->
+<h2 style="margin-top:2rem">Storage Statistics</h2>
+<div class="card-grid">
+  <div class="card">
+    <div class="value">{{ uploads_size }}</div>
+    <div class="label">Uploads Size</div>
+    <div class="text-dim" style="font-size:0.72rem;margin-top:0.15rem">{{ uploads_count }} file(s)</div>
+  </div>
+  <div class="card">
+    <div class="value">{{ dm_uploads_size }}</div>
+    <div class="label">DM Uploads Size</div>
+    <div class="text-dim" style="font-size:0.72rem;margin-top:0.15rem">{{ dm_uploads_count }} file(s)</div>
+  </div>
+  <div class="card">
+    <div class="value">{{ avatars_size }}</div>
+    <div class="label">Avatars Size</div>
+    <div class="text-dim" style="font-size:0.72rem;margin-top:0.15rem">{{ avatars_count }} file(s)</div>
+  </div>
+  <div class="card success">
+    <div class="value">{{ total_storage }}</div>
+    <div class="label">Total Storage Used</div>
+  </div>
+</div>
+
+<h2>Largest Files</h2>
+{% if largest_files %}
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Original Name</th>
+      <th>Size</th>
+      <th>Owner</th>
+      <th>Uploaded At</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for f in largest_files %}
+    <tr>
+      <td class="text-dim">#{{ f.id }}</td>
+      <td>{{ f.original_name }}</td>
+      <td class="text-dim">{{ f.size }}</td>
+      <td><a href="/users/{{ f.user_id }}" style="color:var(--accent);text-decoration:none">{{ f.owner or 'N/A' }}</a></td>
+      <td class="text-dim">{{ f.uploaded_at[:19] }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-dim" style="margin-top:0.5rem">No file data available.</p>
+{% endif %}
+
+<div class="mt-1">
+  <form method="POST" action="/network/prune-orphaned" onsubmit="return confirm('Prune orphaned files? This will remove files not associated with any post, DM, or avatar.');">
+    <button type="submit" class="btn btn-danger">Prune Orphaned Files</button>
+  </form>
+</div>
+{% endblock %}

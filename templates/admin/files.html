@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Files</h1>
+<div class="flex mb-1">
+  <span class="text-dim">{{ total }} file(s) total</span>
+</div>
+<form class="search-box" method="GET" action="/files">
+  <input type="text" name="q" placeholder="Search by filename or user..." value="{{ q }}" autofocus>
+  <button type="submit" class="btn btn-accent">Search</button>
+  {% if q %}<a href="/files" class="btn">Clear</a>{% endif %}
+</form>
+{% if files %}
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>File</th>
+      <th>Type</th>
+      <th>Size</th>
+      <th>User</th>
+      <th>Date</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for f in files %}
+    <tr>
+      <td class="text-dim">#{{ f.id }}</td>
+      <td class="text-truncate" title="{{ f.original_name }}">{{ f.original_name }}</td>
+      <td><span class="badge">{{ f.content_type.split('/')[-1] }}</span></td>
+      <td class="text-dim">{{ (f.size / 1024)|round(1) }}KB</td>
+      <td><a href="/users?q={{ f.username }}" style="color:var(--accent);text-decoration:none">{{ f.username }}</a></td>
+      <td class="text-dim">{{ f.uploaded_at[:10] }}</td>
+      <td>
+        <form method="POST" action="/files/{{ f.id }}/delete" onsubmit="return confirm('Delete file &#39;{{ f.original_name }}&#39; by @{{ f.username }}? The file will be removed from disk.');">
+          <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="pagination">
+  {% if page > 1 %}<a href="/files?q={{ q }}&page={{ page - 1 }}">&laquo; Previous</a>{% endif %}
+  <span>Page {{ page }} of {{ total_pages }}</span>
+  {% if page < total_pages %}<a href="/files?q={{ q }}&page={{ page + 1 }}">Next &raquo;</a>{% endif %}
+</div>
+{% else %}
+<p class="text-dim" style="margin-top:1rem">No files found.</p>
+{% endif %}
+{% endblock %}

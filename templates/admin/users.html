@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Users</h1>
+<div class="flex mb-1">
+  <span class="text-dim">{{ total }} user(s) total</span>
+</div>
+<form class="search-box" method="GET" action="/users">
+  <input type="text" name="q" placeholder="Search by username, name or email..." value="{{ q }}" autofocus>
+  <button type="submit" class="btn btn-accent">Search</button>
+  {% if q %}<a href="/users" class="btn">Clear</a>{% endif %}
+</form>
+{% if users %}
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Username</th>
+      <th>Name</th>
+      <th>Posts</th>
+      <th>Files</th>
+      <th>Followers</th>
+      <th>Created</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in users %}
+    <tr>
+      <td class="text-dim">#{{ u.id }}</td>
+      <td><strong>{{ u.username }}</strong></td>
+      <td>{{ u.display_name or '-' }}</td>
+      <td>{{ u.post_count }}</td>
+      <td>{{ u.file_count }}</td>
+      <td>{{ u.follower_count }}</td>
+      <td class="text-dim">{{ u.created_at[:10] }}</td>
+      <td>
+        <form method="POST" action="/users/{{ u.id }}/delete" onsubmit="return confirm('Delete user &#39;{{ u.username }}&#39;? All posts, files, and data will be permanently removed.');">
+          <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="pagination">
+  {% if page > 1 %}<a href="/users?q={{ q }}&page={{ page - 1 }}">&laquo; Previous</a>{% endif %}
+  <span>Page {{ page }} of {{ total_pages }}</span>
+  {% if page < total_pages %}<a href="/users?q={{ q }}&page={{ page + 1 }}">Next &raquo;</a>{% endif %}
+</div>
+{% else %}
+<p class="text-dim" style="margin-top:1rem">No users found.</p>
+{% endif %}
+{% endblock %}

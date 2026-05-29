@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Security{% endblock %}
+{% block content %}
+<h1>Security</h1>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+{% if success %}
+<div class="alert alert-success">{{ success }}</div>
+{% endif %}
+
+<!-- Section 1: Active Admin Sessions -->
+<h2>Active Admin Sessions</h2>
+<div class="card" style="margin-bottom:1.5rem">
+  <div class="value" style="font-size:1.6rem;font-weight:700;color:var(--accent)">{{ session_count }}</div>
+  <div class="label" style="font-size:0.75rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">active admin session(s)</div>
+</div>
+{% if sessions %}
+<table>
+  <thead>
+    <tr>
+      <th>Token</th>
+      <th>Expires</th>
+      <th>Created At</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in sessions %}
+    <tr>
+      <td class="text-dim" style="font-family:monospace">{{ s.token[:16] }}...</td>
+      <td class="text-dim">{{ s.expires_at[:19] }}</td>
+      <td class="text-dim">{{ s.created_at[:19] }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-dim" style="margin-top:0.5rem">No active sessions.</p>
+{% endif %}
+
+<!-- Section 2: Login Attempts -->
+<h2 style="margin-top:2rem">Login Attempts</h2>
+<form class="search-box" method="GET" action="/security">
+  <input type="text" name="q" placeholder="Filter by username..." value="{{ q }}" autofocus>
+  <button type="submit" class="btn btn-accent">Search</button>
+  {% if q %}<a href="/security" class="btn">Clear</a>{% endif %}
+</form>
+
+{% if login_attempts %}
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Username</th>
+      <th>IP</th>
+      <th>Success</th>
+      <th>Created At</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for la in login_attempts %}
+    <tr>
+      <td class="text-dim">#{{ la.id }}</td>
+      <td>{{ la.username or '-' }}</td>
+      <td class="text-dim">{{ la.ip }}</td>
+      <td>
+        {% if la.success %}
+        <span class="badge" style="background:rgba(158,206,106,0.15);color:var(--success)">Yes</span>
+        {% else %}
+        <span class="badge" style="background:rgba(247,118,142,0.15);color:var(--danger)">No</span>
+        {% endif %}
+      </td>
+      <td class="text-dim">{{ la.created_at[:19] }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="pagination">
+  {% if la_page > 1 %}<a href="/security?q={{ q }}&la_page={{ la_page - 1 }}">&laquo; Previous</a>{% endif %}
+  <span>Page {{ la_page }} of {{ la_total_pages }}</span>
+  {% if la_page < la_total_pages %}<a href="/security?q={{ q }}&la_page={{ la_page + 1 }}">Next &raquo;</a>{% endif %}
+</div>
+{% else %}
+<p class="text-dim" style="margin-top:0.5rem">No login attempts found.</p>
+{% endif %}
+
+<div class="mt-1">
+  <form method="POST" action="/security/clear-login-attempts" onsubmit="return confirm('Clear all login attempt records? This cannot be undone.');">
+    <button type="submit" class="btn btn-danger btn-sm">Clear All Login Attempts</button>
+  </form>
+</div>
+
+<!-- Section 3: Security Events -->
+<h2 style="margin-top:2rem">Security Events</h2>
+{% if security_events %}
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Event Type</th>
+      <th>Description</th>
+      <th>Username</th>
+      <th>IP</th>
+      <th>Created At</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for e in security_events %}
+    <tr>
+      <td class="text-dim">#{{ e.id }}</td>
+      <td><span class="badge" style="background:rgba(224,175,104,0.15);color:var(--warning)">{{ e.event_type }}</span></td>
+      <td class="text-truncate" title="{{ e.description }}" style="max-width:250px">{{ e.description }}</td>
+      <td>{{ e.username or '-' }}</td>
+      <td class="text-dim">{{ e.ip or '-' }}</td>
+      <td class="text-dim">{{ e.created_at[:19] }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="pagination">
+  {% if se_page > 1 %}<a href="/security?q={{ q }}&se_page={{ se_page - 1 }}">&laquo; Previous</a>{% endif %}
+  <span>Page {{ se_page }} of {{ se_total_pages }}</span>
+  {% if se_page < se_total_pages %}<a href="/security?q={{ q }}&se_page={{ se_page + 1 }}">Next &raquo;</a>{% endif %}
+</div>
+{% else %}
+<p class="text-dim" style="margin-top:0.5rem">No security events found.</p>
+{% endif %}
+
+<div class="mt-1">
+  <form method="POST" action="/security/clear-events" onsubmit="return confirm('Clear all security event records? This cannot be undone.');">
+    <button type="submit" class="btn btn-danger btn-sm">Clear All Security Events</button>
+  </form>
+</div>
+
+<!-- Section 4: IP Ban -->
+<h2 style="margin-top:2rem">IP Ban</h2>
+{% if ban_success %}
+<div class="alert alert-success">{{ ban_success }}</div>
+{% endif %}
+{% if ban_error %}
+<div class="alert alert-error">{{ ban_error }}</div>
+{% endif %}
+<form method="POST" action="/security/ban-ip" class="flex mb-1" style="flex-wrap:wrap">
+  <input type="text" name="ip" placeholder="IP address to ban..." required style="flex:1;min-width:200px;padding:0.45rem 0.75rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:inherit;font-size:0.82rem">
+  <input type="text" name="reason" placeholder="Reason (optional)" style="flex:1;min-width:200px;padding:0.45rem 0.75rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:inherit;font-size:0.82rem">
+  <button type="submit" class="btn btn-danger">Ban IP</button>
+</form>
+{% if banned_ips %}
+<table>
+  <thead>
+    <tr>
+      <th>IP</th>
+      <th>Reason</th>
+      <th>Banned By</th>
+      <th>Banned At</th>
+      <th>Hits</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for b in banned_ips %}
+    <tr>
+      <td class="text-dim">{{ b.ip }}</td>
+      <td>{{ b.reason or '-' }}</td>
+      <td>{{ b.banned_by }}</td>
+      <td class="text-dim">{{ b.banned_at[:19] }}</td>
+      <td>{{ b.hit_count or 0 }}</td>
+      <td>
+        <form method="POST" action="/security/unban-ip/{{ b.ip }}" style="display:inline" onsubmit="return confirm('Unban IP {{ b.ip }}?');">
+          <button type="submit" class="btn btn-accent btn-sm">Unban</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-dim" style="margin-top:0.5rem">No IPs banned.</p>
+{% endif %}
+{% endblock %}

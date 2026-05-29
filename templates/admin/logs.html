@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Server Logs{% endblock %}
+{% block head %}
+{% if auto_refresh %}
+<meta http-equiv="refresh" content="5">
+{% endif %}
+{% endblock %}
+{% block content %}
+<h1>Server Logs</h1>
+<div class="flex mb-1">
+  <span class="text-dim">Last {{ log_lines|length }} entries</span>
+  <div class="ml-auto flex">
+    <a href="/logs?refresh=1" class="btn btn-sm {% if auto_refresh %}btn-accent{% endif %}">Auto-refresh (5s)</a>
+    <a href="/logs" class="btn btn-sm">Stop</a>
+  </div>
+</div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem 1rem;max-height:600px;overflow-y:auto;font-size:0.78rem;line-height:1.6">
+  {% if log_lines %}
+    {% for line in log_lines %}
+      {% if line is string %}
+        <div class="text-dim">{{ line }}</div>
+      {% else %}
+        <div class="log-entry">
+          <span class="time">{{ line.timestamp[:19] }}</span>
+          &mdash;
+          <span class="action">{{ line.action }}</span>
+          {% if line.details %}
+          <span class="text-dim" style="font-size:0.75rem">{{ line.details }}</span>
+          {% endif %}
+        </div>
+      {% endif %}
+    {% endfor %}
+  {% else %}
+    <p class="text-dim">No log entries available.</p>
+  {% endif %}
+</div>
+{% endblock %}

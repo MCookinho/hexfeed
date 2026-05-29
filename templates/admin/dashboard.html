@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Dashboard</h1>
+<div class="card-grid">
+  <div class="card"><div class="value">{{ user_count }}</div><div class="label">Users</div></div>
+  <div class="card success"><div class="value">{{ post_count }}</div><div class="label">Posts</div></div>
+  <div class="card"><div class="value">{{ file_count }}</div><div class="label">Files</div></div>
+  <div class="card warning"><div class="value">{{ dm_file_count }}</div><div class="label">DM Files</div></div>
+  <div class="card"><div class="value">{{ chat_count }}</div><div class="label">Global Chat</div></div>
+  <div class="card"><div class="value">{{ like_count }}</div><div class="label">Likes</div></div>
+  <div class="card"><div class="value">{{ follow_count }}</div><div class="label">Followers</div></div>
+  <div class="card"><div class="value">{{ conv_count }}</div><div class="label">DM Conversations</div></div>
+  <div class="card"><div class="value">{{ dm_count }}</div><div class="label">DM Messages</div></div>
+  <div class="card"><div class="value">{{ total_storage }}</div><div class="label">Storage</div></div>
+  <div class="card"><div class="value">{{ db_size }}</div><div class="label">Database</div></div>
+  <div class="card danger"><div class="value">{{ audit_count }}</div><div class="label">Audited Actions</div></div>
+</div>
+
+<div style="margin-bottom: 1.5rem;">
+  <form method="POST" action="/db/maintenance" style="display:inline">
+    <button type="submit" class="btn btn-warning" onclick="return confirm('Run database maintenance? (VACUUM + integrity check)')">&#9881; DB Maintenance</button>
+  </form>
+</div>
+
+<h2>Latest Registered Users</h2>
+<table>
+  <thead><tr><th>ID</th><th>Username</th><th>Name</th><th>Date</th></tr></thead>
+  <tbody>
+    {% for u in recent_users %}
+    <tr>
+      <td class="text-dim">#{{ u.id }}</td>
+      <td><a href="/users?q={{ u.username }}" style="color:var(--accent);text-decoration:none">{{ u.username }}</a></td>
+      <td>{{ u.display_name or '-' }}</td>
+      <td class="text-dim">{{ u.created_at[:10] }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% set max_users = users_per_day | map(attribute='count') | max or 1 %}
+{% set max_posts = posts_per_day | map(attribute='count') | max or 1 %}
+
+<h2 style="margin-top:2rem">Analytics</h2>
+<div class="chart-grid">
+  <div class="chart-container">
+    <h3>Users per Day (last 7 days)</h3>
+    <div class="chart-bar">
+      {% for item in users_per_day %}
+      <div class="bar" style="height: {{ (item.count / max_users * 100) if max_users > 0 else 0 }}%">
+        <span class="bar-value">{{ item.count }}</span>
+        <span class="bar-label">{{ item.date[-5:] }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="chart-container">
+    <h3>Posts per Day (last 7 days)</h3>
+    <div class="chart-bar">
+      {% for item in posts_per_day %}
+      <div class="bar" style="height: {{ (item.count / max_posts * 100) if max_posts > 0 else 0 }}%">
+        <span class="bar-value">{{ item.count }}</span>
+        <span class="bar-label">{{ item.date[-5:] }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card-grid" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))">
+  <div class="card"><div class="value">{{ new_users_today }}</div><div class="label">New Users Today</div></div>
+  <div class="card success"><div class="value">{{ new_posts_today }}</div><div class="label">New Posts Today</div></div>
+</div>
+
+<h2 style="margin-top:1.5rem">Top Users</h2>
+<table>
+  <thead><tr><th>#</th><th>Username</th><th>Posts</th></tr></thead>
+  <tbody>
+    {% for u in top_users %}
+    <tr>
+      <td class="text-dim">{{ loop.index }}</td>
+      <td><a href="/users/{{ u.id }}" style="color:var(--accent);text-decoration:none">{{ u.username }}</a></td>
+      <td>{{ u.post_count }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

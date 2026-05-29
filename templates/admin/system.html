@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}System{% endblock %}
+{% block content %}
+<h1>System</h1>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+{% if success %}
+<div class="alert alert-success">{{ success }}</div>
+{% endif %}
+
+<!-- Section 1: Settings -->
+<h2>Settings</h2>
+<form method="POST" action="/system/save">
+  <table>
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>PoW Difficulty</td>
+        <td><input type="text" name="pow_difficulty" value="{{ settings.pow_difficulty }}" style="width:100%;max-width:300px;padding:0.4rem 0.6rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:inherit;font-size:0.82rem"></td>
+      </tr>
+      <tr>
+        <td>Max Register Attempts/Hour</td>
+        <td><input type="text" name="max_register_attempts" value="{{ settings.max_register_attempts }}" style="width:100%;max-width:300px;padding:0.4rem 0.6rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:inherit;font-size:0.82rem"></td>
+      </tr>
+      <tr>
+        <td>Rate Limit Window (hours)</td>
+        <td><input type="text" name="rate_window_hours" value="{{ settings.rate_window_hours }}" style="width:100%;max-width:300px;padding:0.4rem 0.6rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:inherit;font-size:0.82rem"></td>
+      </tr>
+      <tr>
+        <td>Chat Cleanup Interval (min)</td>
+        <td><input type="text" name="chat_cleanup_mins" value="{{ settings.chat_cleanup_mins }}" style="width:100%;max-width:300px;padding:0.4rem 0.6rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:inherit;font-size:0.82rem"></td>
+      </tr>
+      <tr>
+        <td>Max Post Length</td>
+        <td><input type="text" name="max_post_length" value="{{ settings.max_post_length }}" style="width:100%;max-width:300px;padding:0.4rem 0.6rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:inherit;font-size:0.82rem"></td>
+      </tr>
+      <tr>
+        <td>Max Avatar Size (MB)</td>
+        <td><input type="text" name="max_avatar_size_mb" value="{{ settings.max_avatar_size_mb }}" style="width:100%;max-width:300px;padding:0.4rem 0.6rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:inherit;font-size:0.82rem"></td>
+      </tr>
+    </tbody>
+  </table>
+  <button type="submit" class="btn btn-accent mt-1">Save Settings</button>
+</form>
+
+<!-- Section 2: Announcements -->
+<h2 style="margin-top:2rem">Announcements</h2>
+<h3 style="font-size:0.9rem;color:var(--text-dim);margin-bottom:0.75rem">Create New Announcement</h3>
+<form method="POST" action="/announcements" style="margin-bottom:1.5rem">
+  <div class="form-group">
+    <textarea name="content" rows="3" placeholder="Announcement content..." required style="width:100%;max-width:600px;padding:0.5rem 0.75rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:inherit;font-size:0.85rem;resize:vertical"></textarea>
+  </div>
+  <button type="submit" class="btn btn-accent">Post Announcement</button>
+</form>
+
+{% if announcements %}
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Content</th>
+      <th>Created By</th>
+      <th>Created At</th>
+      <th>Active</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for a in announcements %}
+    <tr>
+      <td class="text-dim">#{{ a.id }}</td>
+      <td class="text-truncate" title="{{ a.content }}">{{ a.content[:120] }}</td>
+      <td>{{ a.created_by or 'System' }}</td>
+      <td class="text-dim">{{ a.created_at[:19] }}</td>
+      <td>
+        {% if a.active %}
+        <span class="badge" style="background:rgba(158,206,106,0.15);color:var(--success)">Yes</span>
+        {% else %}
+        <span class="badge" style="background:rgba(247,118,142,0.15);color:var(--danger)">No</span>
+        {% endif %}
+      </td>
+      <td>
+        <form method="POST" action="/announcements/{{ a.id }}/toggle" style="display:inline">
+          <button type="submit" class="btn btn-sm">{{ 'Deactivate' if a.active else 'Activate' }}</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-dim" style="margin-top:0.5rem">No announcements yet.</p>
+{% endif %}
+
+<!-- Section 3: Health & Maintenance -->
+<h2 style="margin-top:2rem">Health &amp; Maintenance</h2>
+<div class="card-grid">
+  <div class="card"><div class="value">{{ db_size }}</div><div class="label">DB Size</div></div>
+  <div class="card success"><div class="value">{{ disk_free }}</div><div class="label">Disk Free</div></div>
+  <div class="card"><div class="value">{{ user_count }}</div><div class="label">Users</div></div>
+  <div class="card"><div class="value">{{ post_count }}</div><div class="label">Posts</div></div>
+</div>
+
+<div class="flex" style="gap:0.5rem;flex-wrap:wrap">
+  <a href="/system/backup" class="btn btn-accent">&#128190; DB Backup</a>
+  <form method="POST" action="/db/maintenance" style="display:inline">
+    <button type="submit" class="btn btn-warning" onclick="return confirm('Run database maintenance? (VACUUM + integrity check)')">&#9881; DB Maintenance</button>
+  </form>
+</div>
+
+<!-- Section 4: Scheduled Tasks -->
+<h2 style="margin-top:2rem">Scheduled Tasks</h2>
+{% if tasks %}
+<table>
+  <thead>
+    <tr>
+      <th>Task</th>
+      <th>Last Run</th>
+      <th>Next Run</th>
+      <th>Status</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in tasks %}
+    <tr>
+      <td>{{ t.label }}</td>
+      <td class="text-dim">{{ t.last_run }}</td>
+      <td class="text-dim">{{ t.next_run }}</td>
+      <td><span class="badge" style="background:rgba(158,206,106,0.15);color:var(--success)">{{ t.status }}</span></td>
+      <td>
+        <form method="POST" action="/system/task/run/{{ t.name }}" style="display:inline">
+          <button type="submit" class="btn btn-sm">Run Now</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-dim" style="margin-top:0.5rem">No tasks available.</p>
+{% endif %}
+
+<!-- Section 5: Performance -->
+<h2 style="margin-top:2rem">Performance</h2>
+<div class="card-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
+  <div class="card"><div class="value">{{ db_size_formatted }}</div><div class="label">Database Size</div></div>
+  <div class="card"><div class="value">{{ active_connections }}</div><div class="label">Active Connections</div></div>
+</div>
+{% if slow_queries %}
+<h3 style="font-size:0.9rem;color:var(--text-dim);margin-bottom:0.5rem">Recent Slow Queries</h3>
+<table>
+  <thead><tr><th>Duration</th><th>Query</th></tr></thead>
+  <tbody>
+    {% for q in slow_queries %}
+    <tr>
+      <td class="text-dim">{{ q.duration }}ms</td>
+      <td class="text-truncate" style="max-width:500px" title="{{ q.query }}">{{ q.query }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-dim" style="margin-top:0.5rem">No slow queries recorded.</p>
+{% endif %}
+{% endblock %}

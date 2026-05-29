@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}User Detail - {{ user.username }}{% endblock %}
+{% block content %}
+<h1>User Detail</h1>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+{% if success %}
+<div class="alert alert-success">{{ success }}</div>
+{% endif %}
+
+<div class="card" style="margin-bottom:1.5rem">
+  <table>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>ID</td><td class="text-dim">#{{ user.id }}</td></tr>
+      <tr><td>Username</td><td><strong>{{ user.username }}</strong></td></tr>
+      <tr><td>Display Name</td><td>{{ user.display_name or '-' }}</td></tr>
+      <tr><td>Email</td><td>{{ user.email or '-' }}</td></tr>
+      <tr><td>Bio</td><td>{{ user.bio or '-' }}</td></tr>
+      <tr><td>PGP Fingerprint</td><td>{{ user.pgp_fingerprint or '-' }}</td></tr>
+      <tr><td>Created At</td><td class="text-dim">{{ user.created_at[:19] }}</td></tr>
+      <tr>
+        <td>Status</td>
+        <td>
+          {% if user.banned %}
+          <span class="badge" style="background:rgba(247,118,142,0.15);color:var(--danger)">Banned</span>
+          {% else %}
+          <span class="badge" style="background:rgba(158,206,106,0.15);color:var(--success)">Active</span>
+          {% endif %}
+          {% if user.pgp_fingerprint %}
+          <span class="badge" style="background:rgba(122,162,247,0.15);color:var(--accent)">PGP Enabled</span>
+          {% endif %}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="flex mb-1" style="flex-wrap:wrap">
+  {% if user.banned %}
+  <form method="POST" action="/users/{{ user.id }}/unban" style="display:inline">
+    <button type="submit" class="btn btn-accent btn-sm">Unban User</button>
+  </form>
+  {% else %}
+  <form method="POST" action="/users/{{ user.id }}/ban" style="display:inline" onsubmit="return confirm('Ban @{{ user.username }}? This will prevent them from logging in and creating content.');">
+    <button type="submit" class="btn btn-danger btn-sm">Ban User</button>
+  </form>
+  {% endif %}
+  <form method="POST" action="/users/{{ user.id }}/reset-password" style="display:inline" id="reset-form">
+    <button type="button" class="btn btn-warning btn-sm" onclick="document.getElementById('reset-fields').style.display='block';this.style.display='none'">Reset Password</button>
+  </form>
+  {% if user.pgp_fingerprint %}
+  <form method="POST" action="/users/{{ user.id }}/delete-pgp" style="display:inline" onsubmit="return confirm('Delete PGP key for @{{ user.username }}?');">
+    <button type="submit" class="btn btn-danger btn-sm">Delete PGP</button>
+  </form>
+  {% endif %}
+  <a href="/users/{{ user.id }}/export" class="btn btn-sm">Export Data</a>
+  <a href="/users/{{ user.id }}/preview" class="btn btn-sm" target="_blank">View as User</a>
+</div>
+
+<div id="reset-fields" style="display:none;margin-bottom:1rem">
+  <form method="POST" action="/users/{{ user.id }}/reset-password" class="flex" style="flex-wrap:wrap">
+    <input type="password" name="new_password" placeholder="New password" required style="padding:0.45rem 0.75rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:inherit;font-size:0.82rem;flex:1;min-width:200px">
+    <button type="submit" class="btn btn-accent btn-sm">Confirm Reset</button>
+    <button type="button" class="btn btn-sm" onclick="document.getElementById('reset-fields').style.display='none';document.querySelector('#reset-form button[type=button]').style.display='inline'">Cancel</button>
+  </form>
+</div>
+
+<h2>Recent Posts</h2>
+{% if posts %}
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Content</th>
+      <th>Created At</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in posts %}
+    <tr>
+      <td class="text-dim">#{{ p.id }}</td>
+      <td class="text-truncate" title="{{ p.content }}">{{ p.content[:100] or '(empty)' }}</td>
+      <td class="text-dim">{{ p.created_at[:19] }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-dim" style="margin-top:0.5rem">No posts from this user.</p>
+{% endif %}
+
+<h2 style="margin-top:1.5rem">Files</h2>
+{% if files %}
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Original Name</th>
+      <th>Size</th>
+      <th>Uploaded At</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for f in files %}
+    <tr>
+      <td class="text-dim">#{{ f.id }}</td>
+      <td>{{ f.original_name }}</td>
+      <td class="text-dim">{{ f.size }}</td>
+      <td class="text-dim">{{ f.uploaded_at[:19] }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-dim" style="margin-top:0.5rem">No files from this user.</p>
+{% endif %}
+{% endblock %}

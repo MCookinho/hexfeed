@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy._Backend"
+
+[project]
+name = "hexfeed"
+version = "0.1.0"
+description = "Private social network in your terminal"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "MCookinho"},
+]
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
+    "textual>=0.41.0",
+    "httpx>=0.25.0",
+    "bcrypt>=4.1.0",
+    "pgpy>=0.6.0",
+    "stem>=1.8.0",
+    "python-multipart>=0.0.6",
+    "jinja2>=3.1.0",
+]
+
+[project.scripts]
+hexfeed = "hexfeed.client:main"
+hexfeed-server = "hexfeed.server:main"
+
+[tool.setuptools.packages.find]
+include = ["hexfeed*", "client*", "server*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.html", "*.j2"]

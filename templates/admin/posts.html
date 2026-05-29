@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Posts</h1>
+<div class="flex mb-1">
+  <span class="text-dim">{{ total }} post(s) total</span>
+</div>
+<form class="search-box" method="GET" action="/posts">
+  <input type="text" name="q" placeholder="Search post content..." value="{{ q }}" autofocus>
+  <button type="submit" class="btn btn-accent">Search</button>
+  {% if q %}<a href="/posts" class="btn">Clear</a>{% endif %}
+</form>
+{% if posts %}
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Author</th>
+      <th>Content</th>
+      <th>File</th>
+      <th>Date</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in posts %}
+    <tr>
+      <td class="text-dim">#{{ p.id }}</td>
+      <td><a href="/users?q={{ p.username }}" style="color:var(--accent);text-decoration:none">{{ p.username }}</a></td>
+      <td class="text-truncate" title="{{ p.content }}">{{ p.content[:100] or '(empty)' }}</td>
+      <td>{{ 'Yes' if p.file_id else '-' }}</td>
+      <td class="text-dim">{{ p.created_at[:10] }}</td>
+      <td>
+        <form method="POST" action="/posts/{{ p.id }}/delete" onsubmit="return confirm('Delete post #{{ p.id }} by @{{ p.username }}?');">
+          <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="pagination">
+  {% if page > 1 %}<a href="/posts?q={{ q }}&page={{ page - 1 }}">&laquo; Previous</a>{% endif %}
+  <span>Page {{ page }} of {{ total_pages }}</span>
+  {% if page < total_pages %}<a href="/posts?q={{ q }}&page={{ page + 1 }}">Next &raquo;</a>{% endif %}
+</div>
+{% else %}
+<p class="text-dim" style="margin-top:1rem">No posts found.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Chat Messages{% endblock %}
+{% block content %}
+<h1>Chat Messages</h1>
+<div class="flex mb-1">
+  <span class="text-dim">{{ total }} message(s) total</span>
+</div>
+
+<form class="search-box" method="GET" action="/chat">
+  <input type="text" name="q" placeholder="Search messages..." value="{{ q }}" autofocus>
+  <button type="submit" class="btn btn-accent">Search</button>
+  {% if q %}<a href="/chat" class="btn">Clear</a>{% endif %}
+</form>
+
+{% if messages %}
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Username</th>
+      <th>Content</th>
+      <th>Created At</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for msg in messages %}
+    <tr>
+      <td class="text-dim">#{{ msg.id }}</td>
+      <td><a href="/users/{{ msg.user_id }}" style="color:var(--accent);text-decoration:none">{{ msg.username }}</a></td>
+      <td class="text-truncate" title="{{ msg.content }}">{{ msg.content[:120] or '(empty)' }}</td>
+      <td class="text-dim">{{ msg.created_at[:19] }}</td>
+      <td>
+        <form method="POST" action="/chat/{{ msg.id }}/delete" onsubmit="return confirm('Delete chat message #{{ msg.id }} from @{{ msg.username }}?');">
+          <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="pagination">
+  {% if page > 1 %}<a href="/chat?q={{ q }}&page={{ page - 1 }}">&laquo; Previous</a>{% endif %}
+  <span>Page {{ page }} of {{ total_pages }}</span>
+  {% if page < total_pages %}<a href="/chat?q={{ q }}&page={{ page + 1 }}">Next &raquo;</a>{% endif %}
+</div>
+{% else %}
+<p class="text-dim" style="margin-top:1rem">No messages found.</p>
+{% endif %}
+
+<h2 style="margin-top:2rem">Groups</h2>
+<div class="flex mb-1">
+  <span class="text-dim">{{ group_total }} group(s) total</span>
+</div>
+{% if groups %}
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Name</th>
+      <th>Members</th>
+      <th>Created By</th>
+      <th>Created At</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for g in groups %}
+    <tr>
+      <td class="text-dim">#{{ g.id }}</td>
+      <td><strong>{{ g.name }}</strong></td>
+      <td>{{ g.member_count }}</td>
+      <td>{{ g.created_by or '-' }}</td>
+      <td class="text-dim">{{ g.created_at[:10] }}</td>
+      <td class="flex">
+        <a href="/chat/groups/{{ g.id }}/messages" class="btn btn-sm">Messages</a>
+        <form method="POST" action="/chat/groups/{{ g.id }}/delete" style="display:inline" onsubmit="return confirm('Delete group &#39;{{ g.name }}&#39;?');">
+          <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div class="pagination">
+  {% if groups_page > 1 %}<a href="/chat?groups_page={{ groups_page - 1 }}">&laquo; Previous</a>{% endif %}
+  <span>Page {{ groups_page }} of {{ group_total_pages }}</span>
+  {% if groups_page < group_total_pages %}<a href="/chat?groups_page={{ groups_page + 1 }}">Next &raquo;</a>{% endif %}
+</div>
+{% else %}
+<p class="text-dim" style="margin-top:0.5rem">No groups found.</p>
+{% endif %}
+{% endblock %}

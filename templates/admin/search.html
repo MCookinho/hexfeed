@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Global Search{% endblock %}
+{% block content %}
+<h1>Global Search</h1>
+
+<form class="search-box" method="GET" action="/search">
+  <input type="text" name="q" placeholder="Search users, posts, files..." value="{{ q }}" style="max-width:600px" autofocus>
+  <button type="submit" class="btn btn-accent">Search</button>
+  {% if q %}<a href="/search" class="btn">Clear</a>{% endif %}
+</form>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+{% if q %}
+  {% if users or posts or files %}
+    <div class="mb-1 flex" style="gap:0.5rem">
+      <span class="badge" style="background:rgba(122,162,247,0.15);color:var(--accent)">{{ users|length }} User(s)</span>
+      <span class="badge" style="background:rgba(158,206,106,0.15);color:var(--success)">{{ posts|length }} Post(s)</span>
+      <span class="badge" style="background:rgba(224,175,104,0.15);color:var(--warning)">{{ files|length }} File(s)</span>
+    </div>
+
+    {% if users %}
+    <h2><span class="badge" style="background:rgba(122,162,247,0.15);color:var(--accent)">User</span> Results</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Display Name</th>
+          <th>Created At</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td><strong>{{ u.username }}</strong></td>
+          <td>{{ u.display_name or '-' }}</td>
+          <td class="text-dim">{{ u.created_at[:10] }}</td>
+          <td><a href="/users/{{ u.id }}" class="btn btn-sm">View</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if posts %}
+    <h2 style="margin-top:1.5rem"><span class="badge" style="background:rgba(158,206,106,0.15);color:var(--success)">Post</span> Results</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Content</th>
+          <th>Author</th>
+          <th>Created At</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in posts %}
+        <tr>
+          <td class="text-dim">#{{ p.id }}</td>
+          <td class="text-truncate" title="{{ p.content }}">{{ p.content[:100] or '(empty)' }}</td>
+          <td><a href="/users/{{ p.user_id }}" style="color:var(--accent);text-decoration:none">{{ p.username }}</a></td>
+          <td class="text-dim">{{ p.created_at[:10] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if files %}
+    <h2 style="margin-top:1.5rem"><span class="badge" style="background:rgba(224,175,104,0.15);color:var(--warning)">File</span> Results</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Filename</th>
+          <th>Size</th>
+          <th>Owner</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in files %}
+        <tr>
+          <td>{{ f.original_name }}</td>
+          <td class="text-dim">{{ f.size }}</td>
+          <td><a href="/users/{{ f.user_id }}" style="color:var(--accent);text-decoration:none">{{ f.owner or 'N/A' }}</a></td>
+          <td><a href="/files" class="btn btn-sm">View</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    <div class="pagination">
+      {% if page > 1 %}<a href="/search?q={{ q }}&page={{ page - 1 }}">&laquo; Previous</a>{% endif %}
+      <span>Page {{ page }} of {{ total_pages }}</span>
+      {% if page < total_pages %}<a href="/search?q={{ q }}&page={{ page + 1 }}">Next &raquo;</a>{% endif %}
+    </div>
+  {% else %}
+    <p class="text-dim" style="margin-top:1rem">No results found for <strong>{{ q }}</strong>.</p>
+  {% endif %}
+{% else %}
+  <p class="text-dim" style="margin-top:1.5rem">Enter a search term above to search users, posts, and files across the platform.</p>
+{% endif %}
+{% endblock %}

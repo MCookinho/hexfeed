@@ -1,0 +1,28 @@
+# hexfeed
+__pycache__/
+*.py[cod]
+data/
+.venv/
+uploads/*
+!uploads/.gitkeep
+dm_uploads/*
+!dm_uploads/.gitkeep
+.DS_Store
+*.db
+
+# Secrets — never version control
+.admin_password
+data/task_status.json
+data/admin_audit.json
+data/dm_encryption.key
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+*.pyc
+
