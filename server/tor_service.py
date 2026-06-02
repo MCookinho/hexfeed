@@ -61,7 +61,7 @@ class TorOnionService:
                     "CookieAuthentication": "1",
                     "Log": ["warn stdout"],
                 },
-                take_ownership=True,
+                take_ownership=False,
                 timeout=None,
             )
         except Exception as e:
