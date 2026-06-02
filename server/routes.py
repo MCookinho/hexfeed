@@ -2107,7 +2107,9 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 
 @router.get("/download/{filename}")
 def download_installer(filename: str):
-    """Serve um installer script (install.sh, install-macos.sh, install.ps1)."""
+    """Serve um installer script (install.sh, install-macos.sh, install.ps1).
+       Acessível em /api/download/{filename} devido ao prefixo /api do router.
+    """
     SAFE = {"install.sh", "install-macos.sh", "install.ps1", "install-arch.sh", "setup-local.sh", "setup-oracle.sh"}
     if filename not in SAFE:
         raise HTTPException(404, "Installer não encontrado")
