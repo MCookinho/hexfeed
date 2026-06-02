@@ -55,30 +55,17 @@ hexfeed is a **self-hosted**, **anonymous-by-design** social networking platform
 
 ### Install
 
-**Linux / macOS** (no Python needed):
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MCookinho/hexfeed/main/scripts/install.sh | bash
-```
-
-**Windows** (no Python needed):
-```batch
-curl -fsSLo install.bat https://raw.githubusercontent.com/MCookinho/hexfeed/main/scripts/install.bat
-install.bat
-```
-
-**Arch Linux**:
-```bash
-yay -S hexfeed
-```
-
-**From source** (needs Python 3.11+):
-```bash
+# Cross-platform (Linux, macOS, Windows) — one command
 git clone https://github.com/MCookinho/hexfeed.git
 cd hexfeed
 python scripts/install.py
+
+# AUR (Arch Linux)
+yay -S hexfeed
 ```
 
-The installer handles everything: Python detection, Tor installation, virtual environment, dependencies, and PATH setup.
+The installer handles everything: Tor installation, virtual environment, dependencies, and PATH setup.
 
 ```bash
 # Options
