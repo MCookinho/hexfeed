@@ -63,16 +63,16 @@ Wants=tor.service
 Type=simple
 User=hexfeed
 Group=hexfeed
-ExecStart=/usr/local/bin/hexfeed-server --host 127.0.0.1 --port 8080
+ExecStart=/usr/local/bin/hexfeed-server --port 8080
 WorkingDirectory=/opt/hexfeed/src
 Restart=always
 RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
 # Hexfeed precisa criar data/ e uploads/ em tempo de execução
-ProtectSystem=full
-ReadWritePaths=/opt/hexfeed
-ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/hexfeed /home/hexfeed/.config/hexfeed
+ProtectHome=read-only
 CapabilityBoundingSet=
 SystemCallFilter=@system-service
 

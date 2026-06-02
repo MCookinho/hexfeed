@@ -19,6 +19,80 @@ hexfeed is a **self-hosted**, **anonymous-by-design** social networking platform
 
 ---
 
+## 🚀 One-Command Setup
+
+Choose your platform and run the command. Everything else is automatic.
+
+### Local Machine (Linux)
+```bash
+curl -fsSL https://raw.githubusercontent.com/MCookinho/hexfeed/main/scripts/setup-local.sh | bash
+```
+Installs Tor, Python, hexfeed, creates a systemd service (optional), and outputs your 🧅 `.onion` address.
+
+### Oracle Cloud Free Tier
+```bash
+curl -fsSL https://raw.githubusercontent.com/MCookinho/hexfeed/main/scripts/setup-oracle.sh | bash
+```
+Provisions a full `.onion` server on Oracle Cloud Ampere A1 (4 CPU, 24GB RAM). Same result, zero config.
+
+### Arch Linux (AUR)
+```bash
+yay -S hexfeed
+```
+
+### Windows / macOS
+See [Platform installation](#platform-installation) below for per-platform scripts.
+
+---
+
+## Quick Start (Manual)
+
+### Requirements
+- Python 3.11+
+- Tor (optional, for `.onion` — **recommended for anonymity**)
+
+### Install from source
+```bash
+git clone https://github.com/MCookinho/hexfeed.git
+cd hexfeed
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+### Start
+```bash
+# Start the server (localhost only + Tor if available)
+hexfeed-server
+
+# In another terminal, start the client
+hexfeed
+```
+
+On first run, Tor auto-starts if the `tor` binary is available:
+```
+  ⬡ hexfeed:         http://127.0.0.1:8000
+  🧅 Starting Tor (may take up to 2 min on first run)...
+  🧅 Onion service active: http://abcdef1234567890.onion
+  🧅 Share this address for external access — no real IP is exposed.
+```
+
+### First-time setup
+1. Register an account from the TUI client
+2. Access the admin panel at **http://127.0.0.1:8001/admin**
+3. Set your admin password on first access
+4. That's it. You're running your own anonymous social network.
+
+### Share your onion address
+```bash
+curl http://127.0.0.1:8000/api/onion
+# → {"onion_address": "abcdef1234567890.onion"}
+```
+
+Share this address with friends. They connect via Tor — **no one sees your real IP**.
+
+---
+
 ## Anonymity Model
 
 | Attack Vector | Protection |
@@ -45,61 +119,6 @@ hexfeed is a **self-hosted**, **anonymous-by-design** social networking platform
 - **Proof-of-Work** — Hashcash-style PoW + math challenge to prevent bot registration
 - **i18n** — Multi-language interface (Portuguese, English)
 - **Minimalist** — No JavaScript frontend. Just a Python server + TUI client
-
-## Quick start
-
-### Requirements
-
-- Python 3.11+
-- Tor (optional, for `.onion` — **recommended for anonymity**)
-
-### Install
-
-```bash
-# AUR (Arch Linux) — recommended
-yay -S hexfeed
-
-# Or from source
-git clone https://github.com/MCookinho/hexfeed.git
-cd hexfeed
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-```
-
-### Start
-
-```bash
-# Start the server (localhost only + Tor if available)
-hexfeed-server
-
-# In another terminal, start the client
-hexfeed
-```
-
-On first run, Tor auto-starts if the `tor` binary is available:
-```
-  ⬡ hexfeed:         http://127.0.0.1:8000
-  🧅 Starting Tor (may take up to 2 min on first run)...
-  🧅 Onion service active: http://abcdef1234567890.onion
-  🧅 Share this address for external access — no real IP is exposed.
-```
-
-### First-time setup
-
-1. Register an account from the TUI client
-2. Access the admin panel at **http://127.0.0.1:8001/admin**
-3. Set your admin password on first access
-4. That's it. You're running your own anonymous social network.
-
-### Share your onion address
-
-```bash
-curl http://127.0.0.1:8000/api/onion
-# → {"onion_address": "abcdef1234567890.onion"}
-```
-
-Share this address with friends. They connect via Tor — **no one sees your real IP**.
 
 ## Architecture
 
