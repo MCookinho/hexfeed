@@ -56,22 +56,15 @@ hexfeed is a **self-hosted**, **anonymous-by-design** social networking platform
 ### Install
 
 ```bash
-# Cross-platform (Linux, macOS, Windows) — one command
+# AUR (Arch Linux) — recommended
+yay -S hexfeed
+
+# Or from source
 git clone https://github.com/MCookinho/hexfeed.git
 cd hexfeed
-python scripts/install.py
-
-# AUR (Arch Linux)
-yay -S hexfeed
-```
-
-The installer handles everything: Tor installation, virtual environment, dependencies, and PATH setup.
-
-```bash
-# Options
-python scripts/install.py -y              # non-interactive
-python scripts/install.py --no-tor        # skip Tor
-python scripts/install.py --dir ~/hex     # custom directory
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
 ```
 
 ### Start
