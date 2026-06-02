@@ -15,6 +15,7 @@ class TorOnionService:
         self.socks_port = socks_port
         self.control_port = control_port
         self.tor_process = None
+        self.controller = None
         self.onion_address: str | None = None
         self.data_dir: Path | None = None
         self._ready = False
@@ -70,27 +71,27 @@ class TorOnionService:
             return None
 
         try:
-            with Controller.from_port(port=self.control_port) as controller:
-                controller.authenticate()
-                controller.set_conf("__DisablePredictedCircuits", "1")
+            self.controller = Controller.from_port(port=self.control_port)
+            self.controller.authenticate()
+            self.controller.set_conf("__DisablePredictedCircuits", "1")
 
-                saved_key = self._load_key()
-                if saved_key:
-                    service = controller.create_ephemeral_hidden_service(
-                        {80: self.target_port},
-                        key_type="ED25519-V3",
-                        key_content=saved_key,
-                        await_publication=True,
-                    )
-                else:
-                    service = controller.create_ephemeral_hidden_service(
-                        {80: self.target_port},
-                        await_publication=True,
-                    )
-                    self._save_key(service.private_key)
+            saved_key = self._load_key()
+            if saved_key:
+                service = self.controller.create_ephemeral_hidden_service(
+                    {80: self.target_port},
+                    key_type="ED25519-V3",
+                    key_content=saved_key,
+                    await_publication=True,
+                )
+            else:
+                service = self.controller.create_ephemeral_hidden_service(
+                    {80: self.target_port},
+                    await_publication=True,
+                )
+                self._save_key(service.private_key)
 
-                self.onion_address = f"{service.service_id}.onion"
-                self._ready = True
+            self.onion_address = f"{service.service_id}.onion"
+            self._ready = True
         except Exception as e:
             print(f"⚠️  Onion service creation failed: {e}", file=sys.stderr)
             self._cleanup()
@@ -105,6 +106,12 @@ class TorOnionService:
         self._cleanup()
 
     def _cleanup(self):
+        if self.controller:
+            try:
+                self.controller.close()
+            except Exception:
+                pass
+            self.controller = None
         if self.tor_process:
             try:
                 self.tor_process.terminate()
