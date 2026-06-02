@@ -165,10 +165,9 @@ def _start_tor():
         site_dir = next((d for d in site_candidates if d.exists()), None)
         if site_dir:
             site_port = 8081
+            site_script = str(site_dir.parent / "run_site_server.py")
             _site_process = subprocess.Popen(
-                [sys.executable, "-m", "uvicorn", "run_site_server:app",
-                 "--host", "127.0.0.1", "--port", str(site_port),
-                 "--log-level", "warning", "--no-access-log"],
+                [sys.executable, site_script, "--port", str(site_port)],
                 cwd=str(site_dir.parent),
             )
             time.sleep(2)
