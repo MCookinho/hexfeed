@@ -1,0 +1,3 @@
+[console_scripts]
+hexfeed = hexfeed.client:main
+hexfeed-server = hexfeed.server:main
