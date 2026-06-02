@@ -35,7 +35,7 @@ def main():
     args = parser.parse_args()
 
     uvicorn.run(
-        "run_site_server:app",
+        app,
         host=HOST,
         port=args.port,
         log_level="warning",

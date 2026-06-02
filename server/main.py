@@ -158,17 +158,18 @@ def _start_tor():
             print(f"  🧅 API onion:      http://{api_addr}", file=sys.stderr)
 
         # Site onion
+        src_root = Path(__file__).resolve().parent.parent
         site_candidates = [
-            Path(__file__).resolve().parent.parent / "site",
-            Path(__file__).resolve().parent.parent.parent / "site",
+            src_root / "site",
+            src_root.parent / "site",
         ]
         site_dir = next((d for d in site_candidates if d.exists()), None)
         if site_dir:
             site_port = 8081
-            site_script = str(site_dir.parent / "run_site_server.py")
+            site_script = str(src_root / "run_site_server.py")
             _site_process = subprocess.Popen(
                 [sys.executable, site_script, "--port", str(site_port)],
-                cwd=str(site_dir.parent),
+                cwd=str(site_dir),
             )
             time.sleep(2)
             site_addr = tor.create_service("site", 80, site_port)
