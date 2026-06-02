@@ -10,27 +10,25 @@ from stem.process import launch_tor_with_config
 
 class TorOnionService:
 
-    def __init__(self, target_port: int, socks_port: int = 19050, control_port: int = 19051):
-        self.target_port = target_port
+    def __init__(self, socks_port: int = 19050, control_port: int = 19051):
         self.socks_port = socks_port
         self.control_port = control_port
         self.tor_process = None
         self.controller = None
-        self.onion_address: str | None = None
         self.data_dir: Path | None = None
-        self._ready = False
+        self._services: dict[str, str] = {}
 
-    def _key_path(self) -> Path:
-        return self.data_dir / "hs_ed25519_secret_key"
+    def _service_key_path(self, label: str) -> Path:
+        return self.data_dir / f"hs_{label}_ed25519_secret_key"
 
-    def _load_key(self) -> str | None:
-        path = self._key_path()
+    def _load_key(self, label: str) -> str | None:
+        path = self._service_key_path(label)
         if path.exists():
             return path.read_text().strip()
         return None
 
-    def _save_key(self, key: str):
-        path = self._key_path()
+    def _save_key(self, label: str, key: str):
+        path = self._service_key_path(label)
         path.write_text(key)
         path.chmod(0o600)
 
@@ -42,11 +40,11 @@ class TorOnionService:
             except Exception:
                 pass
 
-    def start(self) -> str | None:
+    def start(self) -> bool:
         tor_bin = shutil.which("tor")
         if not tor_bin:
             print("⚠️  Tor binary not found", file=sys.stderr)
-            return None
+            return False
 
         self.data_dir = Path.home() / ".config" / "hexfeed" / "tor"
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -68,39 +66,48 @@ class TorOnionService:
         except Exception as e:
             print(f"⚠️  Tor launch failed: {e}", file=sys.stderr)
             self._cleanup()
-            return None
+            return False
 
         try:
             self.controller = Controller.from_port(port=self.control_port)
             self.controller.authenticate()
             self.controller.set_conf("__DisablePredictedCircuits", "1")
+        except Exception as e:
+            print(f"⚠️  Tor controller failed: {e}", file=sys.stderr)
+            self._cleanup()
+            return False
 
-            saved_key = self._load_key()
+        return True
+
+    def create_service(self, label: str, virtual_port: int, target_port: int) -> str | None:
+        if not self.controller:
+            print(f"⚠️  Tor not started yet", file=sys.stderr)
+            return None
+        try:
+            saved_key = self._load_key(label)
             if saved_key:
                 service = self.controller.create_ephemeral_hidden_service(
-                    {80: self.target_port},
+                    {virtual_port: target_port},
                     key_type="ED25519-V3",
                     key_content=saved_key,
                     await_publication=True,
                 )
             else:
                 service = self.controller.create_ephemeral_hidden_service(
-                    {80: self.target_port},
+                    {virtual_port: target_port},
                     await_publication=True,
                 )
-                self._save_key(service.private_key)
+                self._save_key(label, service.private_key)
 
-            self.onion_address = f"{service.service_id}.onion"
-            self._ready = True
+            addr = f"{service.service_id}.onion"
+            self._services[label] = addr
+            return addr
         except Exception as e:
-            print(f"⚠️  Onion service creation failed: {e}", file=sys.stderr)
-            self._cleanup()
+            print(f"⚠️  Onion service '{label}' failed: {e}", file=sys.stderr)
             return None
 
-        return self.onion_address
-
-    def is_ready(self) -> bool:
-        return self._ready
+    def get_address(self, label: str) -> str | None:
+        return self._services.get(label)
 
     def stop(self):
         self._cleanup()

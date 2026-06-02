@@ -24,7 +24,9 @@ from server.routes import router
 from server.auth import delete_token
 
 onion_address: str | None = None
+onion_site_address: str | None = None
 _tor_service: object | None = None
+_site_process: object | None = None
 
 app = FastAPI(
     title="hexfeed",
@@ -124,7 +126,7 @@ async def max_body_size_middleware(request: Request, call_next):
 
 
 def _start_tor():
-    global onion_address, _tor_service
+    global onion_address, onion_site_address, _tor_service, _site_process
     from server.tor_service import TorOnionService
     import subprocess
     subprocess.run(
@@ -140,17 +142,45 @@ def _start_tor():
         pass
 
     try:
-        tor = TorOnionService(target_port=8080)
+        tor = TorOnionService()
         print("  🧅 Starting Tor (may take up to 2 min on first run)...", file=sys.stderr)
-        addr = tor.start()
-        if addr:
-            onion_address = addr
-            _tor_service = tor
-            print(f"  🧅 Onion service active: http://{addr}", file=sys.stderr)
-            print(f"  🧅 Share this address for external access — no real IP is exposed.", file=sys.stderr)
-        else:
+        if not tor.start():
             print("  ⚠️  Tor not available — server is localhost-only.", file=sys.stderr)
             print("  ⚠️  Install tor to enable onion service: sudo apt install tor", file=sys.stderr)
+            return
+
+        _tor_service = tor
+
+        # API onion
+        api_addr = tor.create_service("api", 80, 8080)
+        if api_addr:
+            onion_address = api_addr
+            print(f"  🧅 API onion:      http://{api_addr}", file=sys.stderr)
+
+        # Site onion
+        site_candidates = [
+            Path(__file__).resolve().parent.parent / "site",
+            Path(__file__).resolve().parent.parent.parent / "site",
+        ]
+        site_dir = next((d for d in site_candidates if d.exists()), None)
+        if site_dir:
+            site_port = 8081
+            _site_process = subprocess.Popen(
+                [sys.executable, "-m", "uvicorn", "run_site_server:app",
+                 "--host", "127.0.0.1", "--port", str(site_port),
+                 "--log-level", "warning", "--no-access-log"],
+                cwd=str(site_dir.parent),
+            )
+            time.sleep(2)
+            site_addr = tor.create_service("site", 80, site_port)
+            if site_addr:
+                onion_site_address = site_addr
+                print(f"  🧅 Site onion:     http://{site_addr}", file=sys.stderr)
+        else:
+            print("  ⚠️  Site directory not found — skipping site onion", file=sys.stderr)
+
+        if api_addr:
+            print(f"  🧅 Share the API onion for client connections.", file=sys.stderr)
     except Exception as e:
         print(f"  ⚠️  Tor error: {e} — server is localhost-only.", file=sys.stderr)
 
@@ -162,7 +192,12 @@ def startup():
     thread.start()
 
     import atexit
-    atexit.register(lambda: _tor_service.stop() if _tor_service else None)
+    def _cleanup():
+        if _tor_service:
+            _tor_service.stop()
+        if _site_process:
+            _site_process.terminate()
+    atexit.register(_cleanup)
 
 
 @app.get("/api/health")
@@ -172,10 +207,11 @@ def health():
 
 @app.get("/api/onion")
 def get_onion():
-    """Retorna o endereço onion do servidor, se disponível."""
-    if onion_address:
-        return {"onion_address": onion_address}
-    return {"onion_address": None}
+    """Retorna os endereços onion do servidor, se disponíveis."""
+    return {
+        "onion_address": onion_address,
+        "onion_site_address": onion_site_address,
+    }
 
 
 @app.post("/api/auth/logout")
