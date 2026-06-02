@@ -8,6 +8,7 @@ import uuid, time, threading, hashlib, secrets, random, re, os
 from collections import defaultdict
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query, Request
+from fastapi.responses import PlainTextResponse
 from fastapi.responses import FileResponse, Response
 from server.database import get_connection, close_connection, DM_UPLOAD_DIR
 from server.crypto import encrypt_file_bytes, decrypt_file_bytes
@@ -2097,6 +2098,31 @@ def download_dm_file(file_id: int, user: dict = Depends(require_user)):
 @router.get("/version")
 def get_version():
     return {"client_min_version": "0.1.0", "server_version": "0.1.0"}
+
+
+# ════════════════════════════════════════════════════════════════════
+# INSTALLER DOWNLOADS - Serve scripts diretamente do repositório
+# ════════════════════════════════════════════════════════════════════
+
+_SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
+
+@router.get("/download/{filename}")
+def download_installer(filename: str):
+    """Serve um installer script (install.sh, install-macos.sh, install.ps1)."""
+    SAFE = {"install.sh", "install-macos.sh", "install.ps1", "install-arch.sh", "setup-local.sh", "setup-oracle.sh"}
+    if filename not in SAFE:
+        raise HTTPException(404, "Installer não encontrado")
+    file_path = _SCRIPTS_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(404, "Installer não encontrado no disco")
+    return PlainTextResponse(
+        content=file_path.read_text(),
+        media_type="text/plain",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 def _cleanup_chat_loop():
