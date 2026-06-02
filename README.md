@@ -2,56 +2,72 @@
 
 > **Anonymous** private social network in your terminal. Tor-native, zero IP leaks, zero trackers.
 
-hexfeed is a **self-hosted**, **anonymous-by-design** social networking platform with a **terminal UI** client. No JavaScript, no tracking, no centralized servers — just you, your friends, and your terminal.
+![](https://img.shields.io/badge/python-%3E%3D3.11-blue)
+![](https://img.shields.io/badge/license-MIT-green)
+![](https://img.shields.io/badge/status-beta-yellow)
+[![](https://img.shields.io/badge/aur-hexfeed-blue)](https://aur.archlinux.org/packages/hexfeed)
 
 ```
-🧅 Tor onion service — no real IP ever exposed
+🧅 Tor onion — no real IP ever exposed
 🔒 No IPs stored — login attempts, logs, rate limiters all IP-free
 📁 No filenames — uploads stored as UUIDs, original names never leak
 🕵️ No Server header — no version fingerprinting
 📧 No email — no PII collected or exposed
 ```
 
-![](https://img.shields.io/badge/python-%3E%3D3.11-blue)
-![](https://img.shields.io/badge/license-MIT-green)
-![](https://img.shields.io/badge/status-beta-yellow)
-[![](https://img.shields.io/badge/aur-hexfeed-blue)](https://aur.archlinux.org/packages/hexfeed)
+---
+
+## Client
+
+### How it works
+
+hexfeed is a **client-server** app. The server runs on your machine (or a remote VM), and you connect to it with the **terminal UI client**. All communication goes through **Tor** — your IP is never exposed.
+
+### Download
+
+Choose your platform and run the command. Installs everything (Tor, Python, hexfeed):
+
+| Platform | Command |
+|----------|---------|
+| **Linux** | `curl -fsSL https://raw.githubusercontent.com/MCookinho/hexfeed/main/scripts/install.sh \| bash` |
+| **macOS** | `curl -fsSL https://raw.githubusercontent.com/MCookinho/hexfeed/main/scripts/install-macos.sh \| bash` |
+| **Windows** | `powershell -c "iwr https://raw.githubusercontent.com/MCookinho/hexfeed/main/scripts/install.ps1 -OutFile install.ps1; .\install.ps1"` |
+| **Arch** | `yay -S hexfeed` |
+
+### Run
+
+```bash
+hexfeed
+```
+
+On first launch, it asks for the server address. If you're running locally, press Enter (defaults to `127.0.0.1:8000`). If connecting to a remote `.onion`, paste the address.
+
+Register an account from the TUI and you're in.
 
 ---
 
-## 🚀 One-Command Setup
+## Server
 
-Choose your platform and run the command. Everything else is automatic.
+Run your own hexfeed server so you and your friends have your own private social network.
 
-### Local Machine (Linux)
+### Quick start (Linux)
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/MCookinho/hexfeed/main/scripts/setup-local.sh | bash
 ```
-Installs Tor, Python, hexfeed, creates a systemd service (optional), and outputs your 🧅 `.onion` address.
+
+This installs Tor, Python, hexfeed, and creates a systemd service (optional). At the end it prints your 🧅 **.onion address**.
 
 ### Oracle Cloud Free Tier
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/MCookinho/hexfeed/main/scripts/setup-oracle.sh | bash
 ```
-Provisions a full `.onion` server on Oracle Cloud Ampere A1 (4 CPU, 24GB RAM). Same result, zero config.
 
-### Arch Linux (AUR)
-```bash
-yay -S hexfeed
-```
+Same thing, deployed on Oracle's always-free Ampere A1 (4 CPU, 24GB RAM).
 
-### Windows / macOS
-See [Platform installation](#platform-installation) below for per-platform scripts.
+### Manual install
 
----
-
-## Quick Start (Manual)
-
-### Requirements
-- Python 3.11+
-- Tor (optional, for `.onion` — **recommended for anonymity**)
-
-### Install from source
 ```bash
 git clone https://github.com/MCookinho/hexfeed.git
 cd hexfeed
@@ -61,35 +77,31 @@ pip install -e .
 ```
 
 ### Start
+
 ```bash
-# Start the server (localhost only + Tor if available)
 hexfeed-server
-
-# In another terminal, start the client
-hexfeed
 ```
 
-On first run, Tor auto-starts if the `tor` binary is available:
+Output:
 ```
-  ⬡ hexfeed:         http://127.0.0.1:8000
-  🧅 Starting Tor (may take up to 2 min on first run)...
-  🧅 Onion service active: http://abcdef1234567890.onion
-  🧅 Share this address for external access — no real IP is exposed.
+  ⬡ hexfeed:         http://127.0.0.1:8080
+  🧅 Starting Tor...
+  🧅 Onion service active: http://your-random-address.onion
+  🧅 Share this address for external access.
 ```
 
-### First-time setup
-1. Register an account from the TUI client
-2. Access the admin panel at **http://127.0.0.1:8001/admin**
-3. Set your admin password on first access
-4. That's it. You're running your own anonymous social network.
+### First access
 
-### Share your onion address
+1. Connect with the client: `hexfeed`
+2. Register an account from the TUI
+3. Open the admin panel at **http://127.0.0.1:8001/admin**
+4. Set your admin password on first access
+
+Share your `.onion` address with friends:
+
 ```bash
-curl http://127.0.0.1:8000/api/onion
-# → {"onion_address": "abcdef1234567890.onion"}
+curl http://127.0.0.1:8080/api/onion
 ```
-
-Share this address with friends. They connect via Tor — **no one sees your real IP**.
 
 ---
 
@@ -97,15 +109,14 @@ Share this address with friends. They connect via Tor — **no one sees your rea
 
 | Attack Vector | Protection |
 |---|---|
-| **Server IP discovery** | Server binds exclusively to `127.0.0.1`. External access **only** via `.onion`. No `--host 0.0.0.0` possible. |
+| **Server IP discovery** | Server binds to `127.0.0.1`. External access **only** via `.onion`. No `--host 0.0.0.0`. |
 | **IP logging** | `login_attempts` and `security_events` tables have **no IP column**. Zero user IPs persisted. |
 | **Access logs** | uvicorn `access_log=False`, `log_level=warning`. No request logging with IPs. |
-| **Server fingerprinting** | `Server` header stripped from all HTTP responses. No version leaks. |
+| **Server fingerprinting** | `Server` header stripped from all HTTP responses. |
 | **Rate limiter IP tracking** | All IPs hashed with per-boot random salt before storage in memory. |
-| **Email / PII** | No email field in API responses. Not collected at registration. |
-| **File metadata** | Original filenames never stored or returned. UUIDs only. |
-| **Filesystem paths** | Avatar paths stored as relative. No absolute path leaks. |
-| **Admin panel** | In-memory admin rate limiter uses hashed IPs. No IP column in login display. |
+| **Email / PII** | No email field. Not collected at registration. |
+| **File metadata** | Original filenames never stored. UUIDs only. |
+| **Filesystem paths** | Avatar paths stored as relative. |
 | **Traffic analysis** | Full Tor onion service with ephemeral key persistence. |
 
 ## Features
@@ -115,7 +126,7 @@ Share this address with friends. They connect via Tor — **no one sees your rea
 - **Terminal UI** — Fast, keyboard-driven client built with [Textual](https://textual.textualize.io)
 - **Self-hosted** — Your data, your server. No cloud, no surveillance
 - **Encrypted DMs** — End-to-end encrypted direct messages using PGP
-- **Admin panel** — Web-based admin at `:8001` with dashboard, user management, IP ban, audit
+- **Admin panel** — Web-based admin at `:8001`
 - **Proof-of-Work** — Hashcash-style PoW + math challenge to prevent bot registration
 - **i18n** — Multi-language interface (Portuguese, English)
 - **Minimalist** — No JavaScript frontend. Just a Python server + TUI client
@@ -123,8 +134,8 @@ Share this address with friends. They connect via Tor — **no one sees your rea
 ## Architecture
 
 ```
-Internet ──> Tor Network ──> .onion ──> 127.0.0.1:8000 ──> FastAPI ──> SQLite
-Local    ──> 127.0.0.1:8000 (same machine)
+Internet ──> Tor Network ──> .onion ──> 127.0.0.1:8080 ──> FastAPI ──> SQLite
+Local    ──> 127.0.0.1:8080
 LAN      ──> ❌ Blocked by design
 ```
 
@@ -134,54 +145,10 @@ LAN      ──> ❌ Blocked by design
 │  (Textual)    │ <────────────────  │  Server       │
 └──────────────┘                    └───────┬──────┘
                                             │
-                                   ┌────────┴────────┐
-                                   │  SQLite3         │
-                                   │  (no IP storage) │
-                                   └─────────────────┘
-```
-
-## API
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| POST | `/register` | Create account (PoW + math challenge required) |
-| POST | `/login` | Authenticate |
-| GET | `/feed` | Get timeline |
-| POST | `/posts` | Create post |
-| GET | `/posts/{id}` | Get post |
-| GET | `/users/{username}` | User profile |
-| POST | `/dm/send` | Send encrypted DM |
-| GET | `/dm/inbox` | Read DMs |
-| GET | `/api/onion` | Get server's `.onion` address |
-
-## Platform installation
-
-### Arch Linux (AUR) — recommended
-```bash
-yay -S hexfeed
-```
-
-### Linux (any distro)
-```bash
-bash scripts/install.sh
-```
-
-### macOS
-```bash
-bash scripts/install-macos.sh
-```
-
-### Windows
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/install.ps1
-```
-
-## Development
-
-```bash
-pip install -e ".[dev]"
-python -m pytest
-hexfeed-server --reload
+                                    ┌───────┴───────┐
+                                    │  SQLite3       │
+                                    │  (no IP store) │
+                                    └───────────────┘
 ```
 
 ## License
