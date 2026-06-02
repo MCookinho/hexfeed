@@ -10,7 +10,7 @@ CONFIG_DIR = Path.home() / ".config" / "hexfeed"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 
-DEFAULT_SERVER_URL = "http://uryagywp6vchlttekoaui75bidl4ir5tamx6mhk3ojg252lnj33dn2qd.onion"
+DEFAULT_SERVER_URL = "http://fucofsrdl2mv36ty6cg54it4fqqvyn462fgdsm54vlpv57izjc4v2mad.onion"
 
 DEFAULT_CONFIG = {
     "language": "pt-BR",
