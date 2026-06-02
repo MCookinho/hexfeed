@@ -15,6 +15,7 @@ from server.auth import (
     hash_password, verify_password, create_token, get_user_from_token,
     delete_token, validate_pgp_key, verify_pgp_private_key,
 )
+from server.main import check_login_bruteforce, record_login_attempt
 
 _RATE_SALT = hashlib.sha256(os.urandom(32)).hexdigest()[:16]
 
@@ -414,12 +415,15 @@ def register(body: RegisterRequest, request: Request):
         
 @router.post("/auth/login", response_model=AuthResponse)
 def login(body: LoginRequest, request: Request = None):
+    if check_login_bruteforce(body.username):
+        raise HTTPException(429, "Conta temporariamente bloqueada por muitas tentativas. Aguarde 15 minutos.")
     conn = get_connection()
     user = conn.execute(
         "SELECT * FROM users WHERE username = ?", (body.username,)
     ).fetchone()
 
     if not user or not verify_password(body.password, user["password_hash"]):
+        record_login_attempt(body.username, success=False)
         conn.execute(
             "INSERT INTO login_attempts (username, success) VALUES (?, 0)",
             (body.username,),
@@ -429,6 +433,7 @@ def login(body: LoginRequest, request: Request = None):
         raise HTTPException(401, "Usuário ou senha inválidos")
 
     if user["banned"]:
+        record_login_attempt(body.username, success=False)
         conn.execute(
             "INSERT INTO login_attempts (username, success) VALUES (?, 0)",
             (body.username,),
@@ -440,6 +445,7 @@ def login(body: LoginRequest, request: Request = None):
     if user["pgp_public_key"]:
         priv_key = (body.pgp_private_key or "").strip()
         if not priv_key:
+            record_login_attempt(body.username, success=False)
             conn.execute(
                 "INSERT INTO login_attempts (username, success) VALUES (?, 0)",
                 (body.username,),
@@ -448,6 +454,7 @@ def login(body: LoginRequest, request: Request = None):
             conn.close()
             raise HTTPException(401, "Chave PGP privada é necessária para esta conta")
         if not verify_pgp_private_key(priv_key, user["pgp_fingerprint"]):
+            record_login_attempt(body.username, success=False)
             conn.execute(
                 "INSERT INTO login_attempts (username, success) VALUES (?, 0)",
                 (body.username,),
@@ -456,6 +463,7 @@ def login(body: LoginRequest, request: Request = None):
             conn.close()
             raise HTTPException(401, "Chave PGP privada inválida")
 
+    record_login_attempt(body.username, success=True)
     conn.execute(
         "INSERT INTO login_attempts (username, success) VALUES (?, 1)",
         (body.username,),
@@ -1855,12 +1863,45 @@ def list_files(user: dict = Depends(require_user)):
         
 @router.get("/files/{file_id}/download")
 def download_file(file_id: int, user: dict = Depends(require_user)):
-    """Baixa um arquivo pelo ID (qualquer usuário autenticado pode baixar qualquer arquivo)."""
+    """Baixa um arquivo pelo ID (apenas o dono ou participantes do post/DM/grupo podem baixar)."""
     conn = get_connection()
     f = conn.execute("SELECT * FROM files WHERE id = ?", (file_id,)).fetchone()
     if not f:
         conn.close()
         raise HTTPException(404, "Arquivo não encontrado")
+
+    # Dono do arquivo sempre pode baixar
+    if f["user_id"] != user["id"]:
+        # Verifica se o arquivo está anexado a um post
+        post = conn.execute(
+            "SELECT p.id, p.user_id FROM posts p WHERE p.file_id = ?", (file_id,)
+        ).fetchone()
+        if post:
+            if post["user_id"] != user["id"]:
+                conn.close()
+                raise HTTPException(403, "Acesso negado a este arquivo")
+
+        # Verifica se está em DM que o usuário participa
+        dm = conn.execute(
+            """SELECT dm.id FROM direct_messages dm
+               JOIN conversations c ON dm.conversation_id = c.id
+               WHERE dm.file_id = ? AND (c.user1_id = ? OR c.user2_id = ?)""",
+            (file_id, user["id"], user["id"]),
+        ).fetchone()
+        if dm:
+            pass
+        else:
+            # Verifica grupo
+            group_msg = conn.execute(
+                """SELECT gm.id FROM group_messages gm
+                   JOIN group_members g ON gm.group_id = g.group_id
+                   WHERE gm.file_id = ? AND g.user_id = ?""",
+                (file_id, user["id"]),
+            ).fetchone()
+            if not group_msg and f["user_id"] != user["id"]:
+                conn.close()
+                raise HTTPException(403, "Acesso negado a este arquivo")
+
     file_path = UPLOAD_DIR / f["storage_name"]
     if not file_path.exists():
         conn.close()
@@ -1870,6 +1911,7 @@ def download_file(file_id: int, user: dict = Depends(require_user)):
         path=str(file_path),
         filename=f["storage_name"],
         media_type=f["content_type"] or "application/octet-stream",
+        headers={"X-Content-Type-Options": "nosniff"},
     )
         
         
@@ -2000,12 +2042,32 @@ async def upload_dm_file(
         
 @router.get("/dm-files/{file_id}/download")
 def download_dm_file(file_id: int, user: dict = Depends(require_user)):
-    """Baixa um arquivo de DM descriptografado."""
+    """Baixa um arquivo de DM descriptografado (apenas participantes da conversa)."""
     conn = get_connection()
     f = conn.execute("SELECT * FROM dm_files WHERE id = ?", (file_id,)).fetchone()
     if not f:
         conn.close()
         raise HTTPException(404, "Arquivo não encontrado")
+
+    # Verifica se o usuário é dono ou participa da conversa/grupo que contém o arquivo
+    if f["user_id"] != user["id"]:
+        dm = conn.execute(
+            """SELECT dm.id FROM direct_messages dm
+               JOIN conversations c ON dm.conversation_id = c.id
+               WHERE dm.dm_file_id = ? AND (c.user1_id = ? OR c.user2_id = ?)""",
+            (file_id, user["id"], user["id"]),
+        ).fetchone()
+        if not dm:
+            group_msg = conn.execute(
+                """SELECT gm.id FROM group_messages gm
+                   JOIN group_members g ON gm.group_id = g.group_id
+                   WHERE gm.dm_file_id = ? AND g.user_id = ?""",
+                (file_id, user["id"]),
+            ).fetchone()
+            if not group_msg:
+                conn.close()
+                raise HTTPException(403, "Acesso negado a este arquivo")
+
     file_path = DM_UPLOAD_DIR / f["storage_name"]
     if not file_path.exists():
         conn.close()
@@ -2020,7 +2082,10 @@ def download_dm_file(file_id: int, user: dict = Depends(require_user)):
     return Response(
         content=decrypted,
         media_type=f["content_type"] or "application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{f["storage_name"]}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{f["storage_name"]}"',
+            "X-Content-Type-Options": "nosniff",
+        },
     )
         
         
