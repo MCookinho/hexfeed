@@ -8,15 +8,14 @@ import uuid, time, threading, hashlib, secrets, random, re, os
 from collections import defaultdict
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query, Request
-from fastapi.responses import PlainTextResponse
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, PlainTextResponse
 from server.database import get_connection, close_connection, DM_UPLOAD_DIR
 from server.crypto import encrypt_file_bytes, decrypt_file_bytes
 from server.auth import (
     hash_password, verify_password, create_token, get_user_from_token,
     delete_token, validate_pgp_key, verify_pgp_private_key,
 )
-from server.main import check_login_bruteforce, record_login_attempt
+from server.bruteforce import check_login_bruteforce, record_login_attempt
 
 _RATE_SALT = hashlib.sha256(os.urandom(32)).hexdigest()[:16]
 

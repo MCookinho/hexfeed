@@ -37,13 +37,7 @@ app = FastAPI(
 
 _RATE_SALT = hashlib.sha256(os.urandom(32)).hexdigest()[:16]
 _rate_limit_store: dict[str, deque] = defaultdict(lambda: deque(maxlen=60))
-
-# Login brute-force protection
-_login_attempts: dict[str, list[float]] = defaultdict(list)
-LOGIN_MAX_ATTEMPTS = 5
-LOGIN_WINDOW = 300  # 5 minutes
-LOGIN_LOCKOUT = 900  # 15 minutes
-_login_lockouts: dict[str, float] = {}
+from server.bruteforce import check_login_bruteforce, record_login_attempt
 
 
 def _hash_ip(ip: str) -> str:
@@ -89,8 +83,6 @@ async def rate_limit_middleware(request: Request, call_next):
     window = 60.0
     path = request.url.path
 
-    # Auth endpoints: stricter per-IP limit (Tor clients share 127.0.0.1,
-    # but hashed IP still works for localhost scenarios)
     is_auth = path in ("/login", "/register")
     max_req = 15 if is_auth else 300
     max_req = 60 if request.client and request.client.host != "127.0.0.1" else max_req
@@ -111,36 +103,6 @@ async def rate_limit_middleware(request: Request, call_next):
     timestamps.append(now)
     response = await call_next(request)
     return response
-
-
-def check_login_bruteforce(username: str) -> bool:
-    """Returns True if the username is temporarily locked out."""
-    now = time.time()
-
-    # Check if currently locked out
-    if username in _login_lockouts:
-        if now < _login_lockouts[username]:
-            return True
-        del _login_lockouts[username]
-
-    # Clean old attempts
-    attempts = _login_attempts[username]
-    while attempts and attempts[0] < now - LOGIN_WINDOW:
-        attempts.pop(0)
-
-    if len(attempts) >= LOGIN_MAX_ATTEMPTS:
-        _login_lockouts[username] = now + LOGIN_LOCKOUT
-        return True
-
-    return False
-
-
-def record_login_attempt(username: str, success: bool):
-    if not success:
-        _login_attempts[username].append(time.time())
-    else:
-        _login_attempts.pop(username, None)
-        _login_lockouts.pop(username, None)
 
 
 MAX_BODY_SIZE = 10 * 1024 * 1024  # 10 MB
