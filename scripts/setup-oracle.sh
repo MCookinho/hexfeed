@@ -39,6 +39,18 @@ sudo -u hexfeed /opt/hexfeed/venv/bin/pip install -q -e /opt/hexfeed/src
 sudo ln -sf /opt/hexfeed/venv/bin/hexfeed /usr/local/bin/hexfeed
 sudo ln -sf /opt/hexfeed/venv/bin/hexfeed-server /usr/local/bin/hexfeed-server
 
+# ── 3b. Create writable directories ──
+echo "  → Setting up data directories..."
+sudo mkdir -p /opt/hexfeed/src/data /opt/hexfeed/src/uploads/avatars
+sudo mkdir -p /opt/hexfeed/data /opt/hexfeed/uploads
+sudo chown -R hexfeed:hexfeed /opt/hexfeed
+sudo usermod -a -G hexfeed ubuntu
+sudo chmod g+rwxs /opt/hexfeed/src/data /opt/hexfeed/src/uploads /opt/hexfeed/src/uploads/avatars
+sudo chmod g+rwxs /opt/hexfeed/data /opt/hexfeed/uploads
+
+# Restart hexfeed to pick up directory changes
+sudo systemctl restart hexfeed 2>/dev/null || true
+
 # ── 4. Systemd service ──
 echo "  → Creating systemd service..."
 sudo tee /etc/systemd/system/hexfeed.service > /dev/null << 'SVC'
@@ -52,12 +64,13 @@ Type=simple
 User=hexfeed
 Group=hexfeed
 ExecStart=/usr/local/bin/hexfeed-server --host 127.0.0.1 --port 8080
-WorkingDirectory=/opt/hexfeed
+WorkingDirectory=/opt/hexfeed/src
 Restart=always
 RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
+# Hexfeed precisa criar data/ e uploads/ em tempo de execução
+ProtectSystem=full
 ReadWritePaths=/opt/hexfeed
 ProtectHome=true
 CapabilityBoundingSet=
@@ -109,5 +122,6 @@ echo -e "   ${DIM}Commands:${RESET}"
 echo -e "   ${DIM}  logs:    journalctl -u hexfeed -f${RESET}"
 echo -e "   ${DIM}  restart: systemctl restart hexfeed${RESET}"
 echo -e "   ${DIM}  update:  cd /opt/hexfeed/src && git pull && systemctl restart hexfeed${RESET}"
+echo -e "   ${DIM}  test:    hexfeed-server  (logout/login first for group permissions)${RESET}"
 echo -e "  ═══════════════════════════════════════"
 echo
