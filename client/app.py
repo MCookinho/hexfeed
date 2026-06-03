@@ -1,8 +1,16 @@
 """
-hexfeed - aplicação TUI principal
+Hexfeed - aplicação TUI principal
 Gerencia as telas (screens) e o estado global do cliente.
 Suporta internacionalização, temas e configurações locais.
+Inicia Tor automaticamente se necessário.
 """
+
+import os
+import shutil
+import socket
+import subprocess
+import time
+from urllib.parse import urlparse
 
 from textual.app import App
 from client.api import HexfeedAPI, ClientState
@@ -72,10 +80,12 @@ class HexfeedApp(App):
         self._language = self._local_config.get("language", "pt-BR")
         self._theme_name = self._local_config.get("theme", "dark")
         self._theme_source_keys: list[tuple[str, str]] = []
+        self._tor_process: subprocess.Popen | None = None
 
         super().__init__()
 
         server_url = self._local_config.get("server_url", "")
+        self._ensure_tor(server_url)
         self.client_state = ClientState(
             server_url=server_url,
         )
@@ -242,6 +252,50 @@ class HexfeedApp(App):
         self.stylesheet.reparse()
         self.stylesheet.update(self)
 
+    def _is_onion_url(self, url: str) -> bool:
+        host = urlparse(url).hostname or ""
+        return host.endswith(".onion")
+
+    def _tor_socks_ports(self) -> list[int]:
+        return [9050, 19050, 9150]
+
+    def _port_open(self, port: int) -> bool:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(1)
+            s.connect(("127.0.0.1", port))
+            s.close()
+            return True
+        except Exception:
+            return False
+
+    def _ensure_tor(self, server_url: str):
+        if not self._is_onion_url(server_url):
+            return
+        for port in self._tor_socks_ports():
+            if self._port_open(port):
+                return
+        tor_path = shutil.which("tor")
+        if not tor_path:
+            return
+        try:
+            proc = subprocess.Popen(
+                [tor_path, "--SocksPort", "9050", "--DataDirectory",
+                 os.path.expanduser("~/.tor-hexfeed")],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            deadline = time.time() + 30
+            while time.time() < deadline:
+                if self._port_open(9050):
+                    self._tor_process = proc
+                    return
+                time.sleep(0.5)
+            proc.terminate()
+            proc.wait(timeout=5)
+        except Exception:
+            pass
+
     def on_mount(self):
         """Inicializa a UI: aplica tema e, se houver token salvo, faz login automático."""
         self.apply_theme()
@@ -285,8 +339,15 @@ class HexfeedApp(App):
             return False
 
     async def on_app_quit(self):
-        """Fecha a sessão HTTP ao encerrar a aplicação."""
+        """Fecha a sessão HTTP e encerra Tor ao sair."""
         try:
             await self.api.close()
         except Exception:
             pass
+        if self._tor_process:
+            try:
+                self._tor_process.terminate()
+                self._tor_process.wait(timeout=5)
+            except Exception:
+                self._tor_process.kill()
+                self._tor_process.wait(timeout=5)
